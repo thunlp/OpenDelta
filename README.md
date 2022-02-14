@@ -10,9 +10,9 @@
 <p align="center">
   <a href="#Overview">Overview</a> •
   <a href="#installation">Installation</a> •
-  <a href="#Supported-Models">Supported Models</a> •
+  <a href="https://opendelta.readthedocs.io/en/latest/notes/usage.html">Basic Usage</a> • 
   <a href="https://opendelta.readthedocs.io/">Docs</a> • 
-  <a href="https://docs.google.com/spreadsheets/d/1BIVa8ocAPga-u7rBOXLYaTfaJSjI1dWfwohmLjmFDrY/edit?usp=sharing">Performance</a> •
+  <a href="#Performance Checked Combination">Performance</a> •
 
 
 </p>
@@ -25,6 +25,8 @@
 
 OpenDelta is a toolkit for parameter efficient methods (we dub it as *delta tuning*), by which users could flexibly assign (or add) a small amount parameters to update while keeping the most paramters frozen. By using OpenDelta, users could easily implement prefix-tuning, adapters, Lora, or any other types of delta tuning with preferred PTMs.
 
+Our repo is tested on Python 3.8 and PyTorch 1.9.0. Lower version may also be supported. 
+
 ## Installation
 create a virtualenv (optional)
 ```shell
@@ -34,8 +36,9 @@ conda activate opendelta_env
 
 ### Using Pip
 
-Our repo is tested on Python 3.6+ and PyTorch 1.8.1+, install OpenDelta using pip as follows:
 
+
+Install OpenDelta using pip as follows:
 ```shell
 pip install opendelta
 ```
@@ -63,7 +66,8 @@ python setup.py develop
 
 ### Verified Supported Models
 
-** You can try to use OpenDelta on any backbone models based on PyTorch.** However, with small chances that
+**You can try to use OpenDelta on *any* backbone models based on PyTorch.**  
+However, with small chances that
 The interface of the submodules of the backbone model is not supported. Therefore we verified some commonly
 used models that OpenDelta are sure to support.
 
@@ -90,5 +94,5 @@ Pull requests are welcomed when you successfully apply OpenDelta on your own bac
 
 Google sheet [here](https://docs.google.com/spreadsheets/d/1BIVa8ocAPga-u7rBOXLYaTfaJSjI1dWfwohmLjmFDrY/edit?usp=sharing)
 
-
+Subject to change at any moment. 
 
