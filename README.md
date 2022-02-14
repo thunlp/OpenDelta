@@ -12,14 +12,14 @@
   <a href="#installation">Installation</a> •
   <a href="https://opendelta.readthedocs.io/en/latest/notes/usage.html">Basic Usage</a> • 
   <a href="https://opendelta.readthedocs.io/">Docs</a> • 
-  <a href="#Performance Checked Combination">Performance</a> •
+  <a href="https://docs.google.com/spreadsheets/d/1BIVa8ocAPga-u7rBOXLYaTfaJSjI1dWfwohmLjmFDrY/edit?usp=sharing">Performance</a> •
 
 
 </p>
 
 </div>
 
-![version](https://img.shields.io/badge/version-v0.1.0-blue)
+![version](https://img.shields.io/badge/version-0.0.1-blue)
 
 ## Overview
 
