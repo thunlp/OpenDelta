@@ -72,7 +72,7 @@ delta = AutoDeltaModel.from_finetuned("DeltaHub/lora_t5-base_mrpc", backbone_mod
 delta.log()
 ```
 
-### Verified Supported Models
+## Verified Supported Models
 
 **You can try to use OpenDelta on *any* backbone models based on PyTorch.**  
 However, with small chances that
@@ -98,7 +98,7 @@ Pull requests are welcomed when you successfully apply OpenDelta on your own bac
 | ViT            | ✅  |     |    |     |     |      |   |     |     |
 
 
-### Performance Checked Combination
+## Performance Checked Combination
 
 Google sheet [here](https://docs.google.com/spreadsheets/d/1BIVa8ocAPga-u7rBOXLYaTfaJSjI1dWfwohmLjmFDrY/edit?usp=sharing)
 
