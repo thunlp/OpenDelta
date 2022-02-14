@@ -77,14 +77,13 @@ delta.log()
 
 ## Verified Supported Models
 
-**You can try to use OpenDelta on *any* backbone models based on PyTorch.**  
-However, with small chances that
-The interface of the submodules of the backbone model is not supported. Therefore we verified some commonly
+- **You can try to use OpenDelta on *any* backbone models based on PyTorch.**  
+- However, with small chances thatThe interface of the submodules of the backbone model is not supported. Therefore we verified some commonly
 used models that OpenDelta are sure to support.
 
-We will keep testing more and more emerging models.
+- We will keep testing more and more emerging models.
 
-Pull requests are welcomed when you successfully apply OpenDelta on your own backbone model.
+- Pull requests are welcomed when you successfully apply OpenDelta on your own backbone model.
 
 
 |            | Lora | Bias<br>Tuning  | Adapter<br>Houstbly | Adapter<br>Preffier  | Adapter<br>Drop  | Adapater<br> Low-Rank   | Compactor  |Prefix<br> Tuning      | Prompt <br> Tuning |
