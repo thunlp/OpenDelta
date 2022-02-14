@@ -1,0 +1,21 @@
+# the final results will be populated here.{
+    "evaluate": {
+        "epoch": 20.0,
+        "eval_accuracy": 89.2156862745098,
+        "eval_average_metrics": 90.76168929110105,
+        "eval_f1": 92.3076923076923,
+        "eval_loss": 0.16493959724903107,
+        "eval_runtime": 1.6391,
+        "eval_samples_per_second": 124.455
+    },
+    "repo_name": "DeltaHub/bitfit_t5-base_mrpc",
+    "test": {
+        "epoch": 20.0,
+        "test_accuracy": 88.23529411764706,
+        "test_average_metrics": 89.97971602434077,
+        "test_f1": 91.72413793103448,
+        "test_loss": 0.14968213438987732,
+        "test_runtime": 1.6344,
+        "test_samples_per_second": 124.82
+    }
+}

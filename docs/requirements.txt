@@ -1,0 +1,13 @@
+sphinx_copybutton
+sphinx_rtd_theme
+sphinx_toolbox
+torch
+transformers
+sentencepiece==0.1.96
+tqdm==4.62.2
+openprompt
+loralib
+decorator
+rich
+myst_parser
+web.py
