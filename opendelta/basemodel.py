@@ -282,13 +282,13 @@ class DeltaBase(nn.Module, SaveLoadMixin):
 
 
 
-    def find_key(self, key: Union[str, re.Pattern], target_list: List[str], only_tail=True):
+    def find_key(self, key: str, target_list: List[Union[str, re.Pattern]], only_tail=True):
         r"""Check whether any target string is in the key or in the tail of the key, i.e., 
 
         Args: 
-            key (Union[:obj:`str`, :obj:`re.Pattern`]): The key (name) of a submodule in a ancestor module.
+            key (:obj:`str`): The key (name) of a submodule in a ancestor module.
                                  E.g., model.encoder.layer.0.attention
-            target_list (List[:obj:`str`]): The target list that we try to match ``key`` with. E.g., ["attention"]
+            target_list (List[Union[:obj:`str`, :obj:`re.Pattern`]]): The target list that we try to match ``key`` with. E.g., ["attention"]
             only_tail (:obj:`bool`): the element in the target_list should be in the tail of key
 
         Returns: 
@@ -299,19 +299,13 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         if not key:
             return False
         try:
-            if isinstance(key, re.Pattern): # TODO: unit test needed ERROR
-                if only_tail:
-                    return endswith_in_regex(key, target_list)
-                else:
-                    return substring_in_regex(key, target_list)
+            if only_tail:
+                return endswith_in(key, target_list)
             else:
-                if only_tail:
-                    return endswith_in(key, target_list)
-                else:
-                    return substring_in(key, target_list)
+                return substring_in(key, target_list)
         except:
             from IPython import embed
-            embed(header = "exception")
+            embed(header = "find_key exception")
 
     def _pseudo_data_to_instantiate(self, module: Optional[nn.Module]=None):
         r"""Create a pseudo_data into the module to know the dimemsion of each tensor in the computation graph.

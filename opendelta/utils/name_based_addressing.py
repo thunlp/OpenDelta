@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union
 import re
 def superstring_in(str_a: str , list_b: List[str]):
     r"""check whether there is any string in list b containing str_a.
@@ -16,7 +16,15 @@ def is_child_key(str_a: str , list_b: List[str]):
     """
     return any(str_b in str_a and (str_b==str_a or str_a[len(str_b)]==".") for str_b in list_b)
 
-def endswith_in(str_a: str , list_b: List[str]):
+def endswith_in(str_a: str, list_b: List[Union[str, re.Pattern]]):
+    return endswith_in_normal(str_a, [b for b in list_b if isinstance(b, str)]) or \
+        endswith_in_regex(str_a, [b for b in list_b if isinstance(b, re.Pattern)])
+
+def substring_in(str_a: str, list_b: List[Union[str, re.Pattern]]):
+    return substring_in_normal(str_a, [b for b in list_b if isinstance(b, str)]) or \
+        substring_in_regex(str_a, [b for b in list_b if isinstance(b, re.Pattern)])
+
+def endswith_in_normal(str_a: str , list_b: List[str]):
     r"""check whether ``str_a`` has a substring that is in list_b.
 
     Args:
@@ -24,7 +32,7 @@ def endswith_in(str_a: str , list_b: List[str]):
     """
     return any(str_a.endswith(str_b) and (str_a==str_b or str_a[-len(str_b)-1] == ".")  for str_b in list_b)
 
-def substring_in(str_a: str , list_b: List[str]):
+def substring_in_normal(str_a: str , list_b: List[str]):
     r"""check whether ``str_a`` has a substring that is in list_b.
 
     Args:
