@@ -28,7 +28,7 @@ OpenDelta is a toolkit for parameter efficient methods (we dub it as *delta tuni
 Our repo is tested on Python 3.8 and PyTorch 1.9.0. Lower version may also be supported. 
 
 **A demo of using Opendelta to modify the PLM (E.g., BART).**
-![How PLM changes using Delta-tuning](docs/source/imgs/dongtu.gif)
+![How PLM changes using Delta-tuning](docs/source/imgs/demo.gif)
 
 ## Installation
 create a virtualenv (optional)
