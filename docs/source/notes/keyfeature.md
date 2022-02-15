@@ -97,7 +97,15 @@ Handcrafting the full names of submodules can be frustrating. We made some simpl
 
 
 2. Regular Expression.
- <img src="../imgs/todo-icon.jpeg" height="30px"> Unit test and Doc later.
+
+    We also support regex end-matching rules. 
+    We use a beginning `[r]` followed by a regular expression to represent this rule, where `[r]` is used to distinguish it from normal end-matching rules and has no other meanings.
+
+    Taking RoBERTa with an classifier on top as an example: It has two modules named `roberta.encoder.layer.0.attention.output.dense` and `roberta.encoder.layer.0.output.dense`, which both end up with `output.dense`. To distinguish them:
+
+    - set `'[r](\d)+\.output.dense'` using regex rules, where `(\d)+` match any layer numbers. This rule only match `roberta.encoder.layer.0.output.dense`.
+
+    - set `'attention.output.dense'` using ordinary rules, which only match `roberta.encoder.layer.0.attention.output.dense`.
 
 3. Interactive Selection.
 

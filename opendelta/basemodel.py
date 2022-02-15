@@ -262,14 +262,14 @@ class DeltaBase(nn.Module, SaveLoadMixin):
 
         if is_leaf_module(module):
             for n, p in module.named_parameters():
-                if self.find_key(".".join([prefix,n]), exclude, only_tail=True):
+                if self.find_key(".".join([prefix,n]), exclude):
                     continue
                 if "deltas" not in exclude or (not (hasattr(p, "_is_delta") and getattr(p, "_is_delta"))):
                     p.requires_grad = False
             return 
         else:
             for n, c in module.named_children():
-                if self.find_key(".".join([prefix,n]), exclude, only_tail=True): # if found, untouch the parameters
+                if self.find_key(".".join([prefix,n]), exclude): # if found, untouch the parameters
                     continue
                 else: # firstly freeze the non module params, then go deeper.
                     params = non_module_param(module)
@@ -282,14 +282,13 @@ class DeltaBase(nn.Module, SaveLoadMixin):
 
 
 
-    def find_key(self, key: str, target_list: List[Union[str, re.Pattern]], only_tail=True):
+    def find_key(self, key: str, target_list: List[str]):
         r"""Check whether any target string is in the key or in the tail of the key, i.e., 
 
         Args: 
             key (:obj:`str`): The key (name) of a submodule in a ancestor module.
                                  E.g., model.encoder.layer.0.attention
             target_list (List[Union[:obj:`str`, :obj:`re.Pattern`]]): The target list that we try to match ``key`` with. E.g., ["attention"]
-            only_tail (:obj:`bool`): the element in the target_list should be in the tail of key
 
         Returns: 
             :obj:`bool` True if the key matchs the target list.
@@ -299,10 +298,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         if not key:
             return False
         try:
-            if only_tail:
-                return endswith_in(key, target_list)
-            else:
-                return substring_in(key, target_list)
+            return endswith_in(key, target_list)
         except:
             from IPython import embed
             embed(header = "find_key exception")
