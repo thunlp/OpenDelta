@@ -262,14 +262,14 @@ class DeltaBase(nn.Module, SaveLoadMixin):
 
         if is_leaf_module(module):
             for n, p in module.named_parameters():
-                if self.find_key(".".join([prefix,n]), exclude, only_tail=True):
+                if self.find_key(".".join([prefix,n]), exclude):
                     continue
                 if "deltas" not in exclude or (not (hasattr(p, "_is_delta") and getattr(p, "_is_delta"))):
                     p.requires_grad = False
             return 
         else:
             for n, c in module.named_children():
-                if self.find_key(".".join([prefix,n]), exclude, only_tail=True): # if found, untouch the parameters
+                if self.find_key(".".join([prefix,n]), exclude): # if found, untouch the parameters
                     continue
                 else: # firstly freeze the non module params, then go deeper.
                     params = non_module_param(module)
@@ -282,14 +282,13 @@ class DeltaBase(nn.Module, SaveLoadMixin):
 
 
 
-    def find_key(self, key: Union[str, re.Pattern], target_list: List[str], only_tail=True):
+    def find_key(self, key: str, target_list: List[str]):
         r"""Check whether any target string is in the key or in the tail of the key, i.e., 
 
         Args: 
-            key (Union[:obj:`str`, :obj:`re.Pattern`]): The key (name) of a submodule in a ancestor module.
+            key (:obj:`str`): The key (name) of a submodule in a ancestor module.
                                  E.g., model.encoder.layer.0.attention
-            target_list (List[:obj:`str`]): The target list that we try to match ``key`` with. E.g., ["attention"]
-            only_tail (:obj:`bool`): the element in the target_list should be in the tail of key
+            target_list (List[Union[:obj:`str`, :obj:`re.Pattern`]]): The target list that we try to match ``key`` with. E.g., ["attention"]
 
         Returns: 
             :obj:`bool` True if the key matchs the target list.
@@ -299,19 +298,9 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         if not key:
             return False
         try:
-            if isinstance(key, re.Pattern): # TODO: unit test needed ERROR
-                if only_tail:
-                    return endswith_in_regex(key, target_list)
-                else:
-                    return substring_in_regex(key, target_list)
-            else:
-                if only_tail:
-                    return endswith_in(key, target_list)
-                else:
-                    return substring_in(key, target_list)
+            return endswith_in(key, target_list)
         except:
-            from IPython import embed
-            embed(header = "exception")
+            raise RuntimeError("find_key exception")
 
     def _pseudo_data_to_instantiate(self, module: Optional[nn.Module]=None):
         r"""Create a pseudo_data into the module to know the dimemsion of each tensor in the computation graph.

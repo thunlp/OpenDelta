@@ -1,6 +1,6 @@
 (unifyname)=
 
-# Unified Name Convention
+# Common Structure Mapping
 
 ```{figure} ../imgs/transformers_structure.png
 :width: 400px
@@ -44,8 +44,8 @@ Visualize bert-base using a common structure name: The submodules that are not c
 :name: transformers_structure
 ```
 
-(commonstructure)=
-## Mappings
+(mappingexample)=
+## Example
 
 Example of bert mapping: a tree with node names specified by <span style="font-weight:bold;color:rgb(55, 125, 34);" >"\_\_name\_\_"</span>
 ```json

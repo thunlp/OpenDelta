@@ -21,6 +21,7 @@
 
 ![version](https://img.shields.io/badge/version-0.0.1-blue)
 
+
 ## Overview
 
 OpenDelta is a toolkit for parameter efficient methods (we dub it as *delta tuning*), by which users could flexibly assign (or add) a small amount parameters to update while keeping the most paramters frozen. By using OpenDelta, users could easily implement prefix-tuning, adapters, Lora, or any other types of delta tuning with preferred PTMs.
@@ -29,6 +30,9 @@ OpenDelta is a toolkit for parameter efficient methods (we dub it as *delta tuni
 
 - **A demo of using Opendelta to modify the PLM (E.g., BART).**
 ![How PLM changes using Delta-tuning](docs/source/imgs/demo.gif)
+
+## Updates
+- 2022.02.16 support [regular expression](docs/source/notes/namebasedaddr#regexexpr) in named-based addressing. 
 
 ## Installation
 create a virtualenv (optional)
@@ -60,7 +64,7 @@ cd OpenDelta
 python setup.py install
 ```
 
-#### Option 2:  If you want to modify the code, run
+#### Option 2:  If you want to modify the code or keep the repo updated by git clone, run
 ```shell
 python setup.py develop
 ```
