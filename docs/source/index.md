@@ -20,6 +20,7 @@ OpenDelta is a **Plug-and-play** Library of the parameter-efficient fine-tuning 
    notes/overview.md
    notes/installation.md
    notes/usage.md
+   notes/namebasedaddr.md
    notes/visualization.md
    notes/saveload.md
 

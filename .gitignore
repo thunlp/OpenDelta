@@ -17,4 +17,6 @@ _build/
 outputs/
 log.txt
 **/DeltaHub/
-*beans
+*beans/
+**/examples/*/configs/
+!examples/*/configs/config_gen.py

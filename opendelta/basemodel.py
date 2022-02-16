@@ -300,8 +300,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         try:
             return endswith_in(key, target_list)
         except:
-            from IPython import embed
-            embed(header = "find_key exception")
+            raise RuntimeError("find_key exception")
 
     def _pseudo_data_to_instantiate(self, module: Optional[nn.Module]=None):
         r"""Create a pseudo_data into the module to know the dimemsion of each tensor in the computation graph.

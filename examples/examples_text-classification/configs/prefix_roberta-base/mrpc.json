@@ -24,7 +24,7 @@
     "per_device_eval_batch_size": 32,
     "per_device_train_batch_size": 32,
     "predict_with_generate": true,
-    "push_to_hub": true,
+    "push_to_hub": false,
     "save_steps": 200,
     "save_strategy": "steps",
     "save_total_limit": 1,
@@ -39,5 +39,9 @@
         "deltas",
         "classifier"
     ],
+    "modified_modules":[
+        "[r][0-5]\\.attention"
+    ],
+    "reparameterize": false,
     "warmup_steps": 0
 }
