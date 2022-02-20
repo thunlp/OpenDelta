@@ -277,7 +277,7 @@ class CompacterModel(DeltaBase):
         adapterlayer = self.new_module_like(ref)
         self.insert_sequential_module(ref, 
                                       delta_module=adapterlayer,
-                                      name="compactor")
+                                      delta_name="compactor")
     
     def new_module_like(self, module):
         module_device = get_device(module)

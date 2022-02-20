@@ -1,4 +1,3 @@
-from turtle import forward
 from typing import Optional, Union
 
 from opendelta.utils.signature import get_arg_names, get_arg_names_inside_func
@@ -8,42 +7,6 @@ from transformers.models.t5 import T5ForConditionalGeneration
 import loralib as lora
 import torch.nn as nn
 from opendelta import BaseDeltaConfig
-import math
-
-class LowRankLinear(nn.Module):
-    #  ------------------------------------------------------------------------------------------
-    #  Copyright (c) Microsoft Corporation. All rights reserved.
-    #  Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
-    #  ------------------------------------------------------------------------------------------
-    #  copy from loralib and do some refactor
-    def __init__(self,
-        in_features,
-        out_features,
-        weight,
-        r=8, 
-        lora_alpha=16,
-        lora_dropout=0.0,
-    ):
-        super().__init__()
-        self.r = r
-        self.lora_alpha = lora_alpha
-        self.lora_dropout = lora_dropout
-        self.lin = nn.Linear(in_features, out_features) #
-        if lora_dropout > 0.:
-            self.lora_dropout = nn.Dropout(p=lora_dropout)
-        else:
-            self.lora_dropout = lambda x: x
-        if r > 0:
-            self.lora_A = nn.Parameter(weight.new_zeros((r, in_features)))
-            self.lora_B = nn.Parameter(weight.new_zeros((out_features, r)))
-            self.scaling = self.lora_alpha / self.r
-            self.lin.reset_parameters() #
-            nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
-            nn.init.zeros_(self.lora_B)
-
-    def forward(self, x):
-        return (self.lora_dropout(x) @ self.lora_A.T @ self.lora_B.T) * self.scaling
-
 
 class LoraConfig(BaseDeltaConfig):
     r"""
@@ -125,10 +88,11 @@ class LoraModel(DeltaBase):
                                    )
     
     
+    
     def update_module(self, module: nn.Module, key: str):
         parent_ref, child_name, child_ref = self.find_module(module, key)
-        parallel_module = self.new_module_like(child_module=child_ref)
-        self.insert_parallel_module(child_ref, delta_module=parallel_module, delta_name="lora")
+        new_module = self.new_module_like(child_module=child_ref)
+        self.replace_module(parent_ref, child_name, child_ref, new_module, delta_name="lora")
         
     def _pseudo_data_to_instantiate(self, module):
         # no need to pass pseudo input, so overwrite it
@@ -137,13 +101,26 @@ class LoraModel(DeltaBase):
     def new_module_like(self, child_module):
         if isinstance(child_module, nn.Linear):
             in_features, out_features = child_module.in_features, child_module.out_features
-            new_module = LowRankLinear(in_features = in_features, 
-                                     out_features = out_features, 
-                                     weight = child_module.weight,
+            new_module = lora.Linear(in_features=in_features, 
+                                     out_features=out_features, 
                                      r=self.lora_r, 
                                      lora_alpha=self.lora_alpha,
                                      lora_dropout=self.lora_dropout)
-            self.delta_modules.append(new_module)  
+            new_module.weight = child_module.weight
+            new_module.bias = child_module.bias # if bias is None, also copy
         else:
             raise NotImplementedError
         return new_module
+
+    
+    
+    def mark_as_delta(self, module: nn.Module = None):
+        if module is None:
+            module=self
+        for n, p in module.named_parameters():
+            param_name = n.split(".")[-1]
+            if "lora_A" in param_name or "lora_B" in param_name: # only lora_A, lora_B is the delta parameter.
+                setattr(p, "_is_delta", True)
+    
+
+        

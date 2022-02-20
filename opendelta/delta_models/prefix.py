@@ -512,7 +512,7 @@ class PrefixModel(DeltaBase):
                                               module_list=self.delta_modules)
             self.delta_modules = None
             self.reparams = reparams
-            self.insert_sequential_module(first_modified_module, delta_module=reparams, name="reparams", strict=False)
+            self.insert_sequential_module(first_modified_module, delta_module=reparams, delta_name="reparams", strict=False)
         self.mark_as_delta()
         return module
     
@@ -522,7 +522,7 @@ class PrefixModel(DeltaBase):
         _, _, ref = self.find_module(module, key)
 
         prefixlayer, ref = self.new_module_like(ref)
-        self.insert_sequential_module(ref, delta_module=prefixlayer, name="prefix")
+        self.insert_sequential_module(ref, delta_module=prefixlayer, delta_name="prefix")
         self.delta_modules.append(prefixlayer)  
     
     def new_module_like(self, module):
