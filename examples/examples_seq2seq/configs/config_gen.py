@@ -66,6 +66,19 @@ AllConfigs['adapter_t5-base'].update({
                                 "output_dir": "outputs/adapter/t5-base/",
                             })
 
+AllConfigs['parallel_adapter_t5-base'] = copy.deepcopy(BaseConfigs['t5-base'])
+AllConfigs['parallel_adapter_t5-base'].update({
+                                "delta_type": "parallel_adapter",
+                                "learning_rate": 3e-4,
+                                "unfrozen_modules": [
+                                    "deltas",
+                                    "layer_norm",
+                                    "final_layer_norm"
+                                ],
+                                "bottleneck_dim":24,
+                                "output_dir": "outputs/parallel_adapter/t5-base/",
+                            })
+
 AllConfigs['lora_t5-base'] = copy.deepcopy(BaseConfigs['t5-base'])
 AllConfigs['lora_t5-base'].update({
                                 "delta_type": "lora",

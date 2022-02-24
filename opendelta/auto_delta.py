@@ -18,6 +18,7 @@ DELTA_CONFIG_MAPPING = {
     "compacter":"CompacterConfig",
     "prefix": "PrefixConfig",
     "soft_prompt": "SoftPromptConfig",
+    "parallel_adapter": "ParallelAdapterConfig",
 }
 
 DELTA_MODEL_MAPPING = {
@@ -28,6 +29,7 @@ DELTA_MODEL_MAPPING = {
     "compacter": "CompacterModel",
     "prefix": "PrefixModel",
     "soft_prompt": "SoftPromptModel",
+    "parallel_adapter": "ParallelAdapterModel",
 }
 
 class _LazyConfigMapping(OrderedDict):

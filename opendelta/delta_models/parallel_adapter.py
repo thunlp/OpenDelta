@@ -15,7 +15,7 @@ from opendelta import BaseDeltaConfig
 import opendelta.utils.logging as logging
 logger = logging.get_logger(__name__)
 
-class AdapterLayer(nn.Module):
+class ParallelAdapterLayer(nn.Module):
     r"""A layer of adapter tuning module. 
     """
     layer_count = 0
@@ -28,15 +28,16 @@ class AdapterLayer(nn.Module):
     def get_layer_count(cls):
         return cls.layer_count
 
-    def __init__(self, bottleneck_dim=24, non_linearity='gelu_new', device=None):
+    def __init__(self, bottleneck_dim=24, non_linearity='gelu_new', scaled=1, device=None):
         super().__init__()
         self.bottleneck_dim = bottleneck_dim
         self.device = device
         self.instantiated = False
         self.non_linearity = non_linearity
+        self.scaled = scaled
         
-        self.layer_id = AdapterLayer.get_layer_count()
-        AdapterLayer.count_layer()
+        self.layer_id = ParallelAdapterLayer.get_layer_count()
+        ParallelAdapterLayer.count_layer()
         
     
     def instantiate(self, hidden_dim):
@@ -65,15 +66,15 @@ class AdapterLayer(nn.Module):
                 module.bias.data.zero_()
         
     
-    def post_forward(self, output):
+    def pre_forward(self, *args, **kwargs):
         r""" Get the hidden_states from the PLM's layer output, pass it into the adapter, 
         then combined with the main hidden_states. Finally pass it into the subsequent layer.
 
         """
-        if isinstance(output, tuple):
-            hiddens = output[0]
-        elif isinstance(output, torch.Tensor):
-            hiddens = output
+        if isinstance(args, tuple):
+            hiddens = args[0]
+        elif isinstance(args, torch.Tensor):
+            hiddens = args
         else:
             raise TypeError
 
@@ -84,27 +85,32 @@ class AdapterLayer(nn.Module):
             self.instantiate(hidden_dim=self.hidden_dim)
                 
 
-        adapter_output = self.modulelist(hiddens)
-        modified_output = adapter_output + hiddens # TODO option: disable residual_connection
-        if isinstance(output, tuple):
-            output = (modified_output,) + output[1:]
-        elif isinstance(output, torch.Tensor):
-            output = modified_output
+        self.adapter_output = self.modulelist(hiddens) * self.scaled + hiddens # TODO add hiddens?
+        return args, kwargs
+
+    def post_forward(self, *args, **kwargs):
+        if isinstance(args, tuple):
+            output = args[0]
+        elif isinstance(args, torch.Tensor):
+            output = args
         else:
             raise TypeError
-        return output
+
+        modified_output = self.adapter_output + output
+        return modified_output
     
   
 
-class AdapterConfig(BaseDeltaConfig):
+class ParallelAdapterConfig(BaseDeltaConfig):
     r"""
-    This is the configuration class to store the configuration of a :py:class:`~AdapterModel`
+    This is the configuration class to store the configuration of a :py:class:`~ParallelAdapterModel`
 
     """
     def __init__(
         self, 
         bottleneck_dim: Optional[int]=24, 
         non_linearity: Optional[str]='gelu_new',
+        scaled: Optional[float]=1.,
         **kwargs
     ): 
         super().__init__(**kwargs)
@@ -115,9 +121,9 @@ class AdapterConfig(BaseDeltaConfig):
 
 
 
-class AdapterModel(DeltaBase):
-    r""" The implementation of Adapter(`Parameter-Efficient Transfer Learning for NLP <https://arxiv.org/abs/1902.00751>`_ ) .
-    Add adapter to the designated ``modified_modules``. In sequential paradigm, The modules' output is then passed into the adapter's 
+class ParallelAdapterModel(DeltaBase):
+    r""" The implementation of Parallel Adapter(`TOWARDS A UNIFIED VIEW OF PARAMETER-EFFICIENT TRANSFER LEARNING <https://arxiv.org/abs/2110.04366>`_ ) .
+    Add adapter to the designated ``modified_modules``. In parallel paradigm, The modules' output is then passed into the adapter's 
     post_forward. 
     
     .. note::
@@ -135,14 +141,14 @@ class AdapterModel(DeltaBase):
         backbone_model (:obj:`transformers.PretrainedModels`): The backbone model to be modified. 
         bottleneck_dim (:obj:`int`): The dimension of the adapter's bottleneck. 
         non_linearity (:obj:`str`): The non linearity of the adapter.
-        modified_modules (:obj:`List[str]`): modules to add adapter after them.
-        unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen together with the adapter parameters.
+        modified_modules (:obj:`List[str]`): modules to add parallel adapter. Must be paired. For examples, ["attn", "attn", "ff.w1", "ff.w2"] add one parallel adapter from attn's input to attn's output, and another one from ff.w1's input to ff.w2's output.
+        unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen together with the parallel adapter parameters.
         common_structure (:obj:`bool`): whether using name-based addressing witha common structure mapping.
 
     """
-    config_class = AdapterConfig
+    config_class = ParallelAdapterConfig
     delta_type = "adapter"
-    default_modified_modules = ["attn", "ff"]
+    default_modified_modules = ["attn", "attn", "ff.w1", "ff.w2"]
     def __init__(self,
                  backbone_model: nn.Module, 
                  bottleneck_dim: Optional[int]=24, 
@@ -166,6 +172,7 @@ class AdapterModel(DeltaBase):
 
         self.delta_modules = nn.ModuleList()
 
+        self.ith = 0
         self.add_all_delta_to_backbone(self.backbone_model,
                                    self.modified_modules,
                                    )
@@ -173,12 +180,17 @@ class AdapterModel(DeltaBase):
     
     def update_module(self, module: nn.Module, key: str):
         _, _, ref = self.find_module(module, key)
-        adapterlayer = self.new_module_like(ref)
-        self.insert_sequential_module(ref, delta_module=adapterlayer, delta_name="adapter")
+        if self.ith % 2 == 0:
+            adapterlayer = self.new_module_like(ref)
+            self.insert_before_module(ref, delta_module=adapterlayer, delta_name="parallel_adapter")
+        else:
+            adapterlayer = self.delta_moduels[-1]
+            self.insert_after_module(ref, delta_module=adapterlayer, delta_name="parallel_adapter")
+        self.ith += 1
     
     def new_module_like(self, module):
         module_device = get_device(module)
-        adapterlayer = AdapterLayer(bottleneck_dim=self.bottleneck_dim, non_linearity=self.non_linearity, device=module_device)
+        adapterlayer = ParallelAdapterLayer(bottleneck_dim=self.bottleneck_dim, non_linearity=self.non_linearity, device=module_device)
         self.delta_modules.append(adapterlayer)  
         return adapterlayer
     
