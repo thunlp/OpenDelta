@@ -19,4 +19,8 @@ log.txt
 **/DeltaHub/
 *beans/
 **/examples/*/configs/
-!examples/*/configs/config_gen.py
+!**/examples/*/configs/config_gen.py
+**/outputs_search/**/*.bin
+**/outputs_search/**/*.pt
+*.db
+**/nohup.out
