@@ -44,6 +44,12 @@ class LowRankLinear(nn.Module):
     def forward(self, x):
         return (self.lora_dropout(x) @ self.lora_A.T @ self.lora_B.T) * self.scaling
 
+    # def pre_forward(self, *args, **kwargs):
+    #     return (args[0] + (self.lora_dropout(args[0]) @ self.lora_A.T @ self.lora_B.T) * self.scaling,), {}
+
+    # def post_forward(self, *args, **kwargs):
+    #     return args[0] + (self.lora_dropout(args[0]) @ self.lora_A.T @ self.lora_B.T) * self.scaling
+
 
 class LoraConfig(BaseDeltaConfig):
     r"""
