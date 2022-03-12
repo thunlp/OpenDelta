@@ -24,3 +24,7 @@ log.txt
 **/outputs_search/**/*.pt
 *.db
 **/nohup.out
+**/examples/examples_bmtrain/BigModels/down_data
+**/examples/examples_bmtrain/BMTrain_stable
+**/examples/examples_bmtrain/BMPretrain
+**/examples/examples_bmtrain/BigModels/BigModels/results

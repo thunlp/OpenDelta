@@ -41,6 +41,13 @@ if __name__=="__main__":
             os.mkdir(f"{args.output_dir}")
         else:
             if not args.continue_study:
+                user_cmd = input("Detected existing study, are you sure to create new by removing old? [Yes/No]")
+                while user_cmd.lower() not in ["yes", "no"]:
+                    print("Please input Yes/No")
+                    user_cmd = input("Detected existing study, are you sure to create new by removing old? [Yes/No]")
+
+                if user_cmd.lower() == "no":
+                    exit()
                 shutil.rmtree(f"{args.output_dir}")
                 os.mkdir(f"{args.output_dir}")
 

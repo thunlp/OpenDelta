@@ -75,17 +75,17 @@ class BoolQPrompt(BasePrompt):
 class BoolQPrompt(BasePrompt):
     generation_verbalizers = [
         {
-            "0": "No",
-            "1": "Yes"
+            "0": "no",
+            "1": "yes"
         },
     ]
     mlmhead_verbalizers = {
-        "0": "No",
-        "1": "Yes"
+        "0": "no",
+        "1": "yes"
     }
     textual_templates = [
-        ["hypothesis", """[_eval_]example['hypothesis']""", 
-        "sentence2:", """[_eval_]example["sentence2"]""", "Meanings different of same? Answer: " ]
+        ["hypothesis:", """[_eval_]example['hypothesis']""", 
+        "premise:", """[_eval_]example["premise"]""", "The answer was " ]
     ]
 
 class COLAPrompt(BasePrompt):
@@ -104,9 +104,48 @@ class COLAPrompt(BasePrompt):
         "grammar correct? " ]
     ]
 
+
+class RTEPrompt(BasePrompt):
+    generation_verbalizers = [
+        {
+            "0": "yes",
+            "1": "no"
+        },
+    ]
+    mlmhead_verbalizers = {
+        "0": "yes",
+        "1": "no"
+    }
+    textual_templates = [
+        ["sentence1:", """[_eval_]example['premise']""", "sentence2:",
+        """[_eval_]example['hypothesis']""",
+        "The answer was " ]
+    ]
+
+class CBPrompt(BasePrompt):
+    generation_verbalizers = [{
+        "0": "yes",
+        "1": "no",
+        "2": "maybe"
+    },
+    ]
+    mlmhead_verbalizers = [{
+        "0": "yes",
+        "1": "no",
+        "2": "maybe"
+    }]
+    textual_templates = [
+        ["hypothesis:", """[_eval_]example['hypothesis']""", "premise:",
+        """[_eval_]example['premise']""",
+        "The answer was " ]
+    ]
+
 PromptCollections = {
     "mrpc": MRPCPrompt,
     "cola": COLAPrompt,
+    "rte": RTEPrompt,
+    "superglue-boolq": BoolQPrompt,
+    "cb": CBPrompt,
 }
     
 

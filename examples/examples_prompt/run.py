@@ -18,7 +18,7 @@ Fine-tuning the library models for sequence to sequence.
 # You can also adapt this script on your own sequence to sequence task. Pointers for this are left as comments.
 import functools
 import logging
-from opendelta.utils.delta_hub import create_hub_repo_name
+from opendelta.utils.delta_center import create_hub_repo_name
 import torch 
 import os
 os.environ['MKL_THREADING_LAYER'] = 'GNU' 

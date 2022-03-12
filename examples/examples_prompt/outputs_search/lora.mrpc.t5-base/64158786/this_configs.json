@@ -1,0 +1,48 @@
+{
+    "batch_size": 64,
+    "dataset_config_name": [
+        "en"
+    ],
+    "delta_type": "lora",
+    "do_eval": true,
+    "do_test": true,
+    "do_train": true,
+    "eval_dataset_config_name": [
+        "en"
+    ],
+    "eval_dataset_name": "mrpc",
+    "eval_steps": 200,
+    "evaluation_strategy": "steps",
+    "gradient_accumulation_steps": 2,
+    "greater_is_better": true,
+    "learning_rate": 1.599320129412575e-05,
+    "load_best_model_at_end": true,
+    "lora_r": 8,
+    "max_source_length": 128,
+    "max_steps": 5000,
+    "metric_for_best_model": "average_metrics",
+    "model_name_or_path": "t5-base",
+    "output_dir": "outputs_search/lora.mrpc.t5-base/64158786",
+    "overwrite_output_dir": true,
+    "per_device_eval_batch_size": 64,
+    "per_device_train_batch_size": 64,
+    "predict_with_generate": true,
+    "push_to_hub": false,
+    "save_steps": 200,
+    "save_strategy": "steps",
+    "save_total_limit": 1,
+    "seed": 100,
+    "split_validation_test": true,
+    "task_name": "mrpc",
+    "test_dataset_config_name": [
+        "en"
+    ],
+    "test_dataset_name": "mrpc",
+    "tokenizer_name": "t5-base",
+    "unfrozen_modules": [
+        "deltas",
+        "layer_norm",
+        "final_layer_norm"
+    ],
+    "warmup_steps": 0
+}

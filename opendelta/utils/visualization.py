@@ -386,26 +386,28 @@ class Visualization(object):
         r"""[NODOC] Add parameter infomation of the module. The parameters that are not inside a module (i.e., created using nn.Parameter) will be added in this function.
         """
         known_module = [n for n,c in m.named_children()]
-        for n,p in m.named_parameters():
-            if n.split(".")[0] not in known_module:
-                if len(n.split(".")) > 1: raise RuntimeError(f"The name field {n} should be a parameter since it doesn't appear in named_children, but it contains '.'")
-                info = "{}:{}".format(n, list(p.shape))
+        try:
+            for n,p in m.named_parameters():
+                if n.split(".")[0] not in known_module:
+                    if len(n.split(".")) > 1: raise RuntimeError(f"The name field {n} should be a parameter since it doesn't appear in named_children, but it contains '.'")
+                    info = "{}:{}".format(n, list(p.shape))
 
-                if record_grad_state:
-                    if not p.requires_grad:
-                        color = self.no_grad_color
+                    if record_grad_state:
+                        if not p.requires_grad:
+                            color = self.no_grad_color
+                        else:
+                            color = self.param_color
                     else:
                         color = self.param_color
-                else:
-                    color = self.param_color
-                
-                if record_delta:
-                    if hasattr(p, "_is_delta") and getattr(p, "_is_delta"):
-                        color = self.delta_color
+                    
+                    if record_delta:
+                        if hasattr(p, "_is_delta") and getattr(p, "_is_delta"):
+                            color = self.delta_color
 
-                tree.add(info=info, is_param_node=True, param_color=color)
-
-    
+                    tree.add(info=info, is_param_node=True, param_color=color)
+        except:
+            from IPython import embed; embed(header='in vis')
+        
  
         
     

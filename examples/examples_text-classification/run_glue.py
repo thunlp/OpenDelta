@@ -31,7 +31,7 @@ from typing import Optional
 import datasets
 import numpy as np
 from datasets import load_dataset, load_metric
-from opendelta.utils.delta_hub import create_hub_repo_name
+# from opendelta.utils.delta_center import create_hub_repo_name
 
 import transformers
 from transformers import (
