@@ -603,6 +603,7 @@ def main():
                             item = label_list[item]
                             writer.write(f"{index}\t{item}\n")
         
+    # from IPython import embed; embed()
 
     # kwargs = {"finetuned_from": model_args.model_name_or_path, "tasks": "text-classification"}
     # if data_args.task_name is not None:
