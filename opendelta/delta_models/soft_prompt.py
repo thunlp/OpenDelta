@@ -193,11 +193,11 @@ class SoftPromptModel(DeltaBase):
         soft_prompt_layer = self.new_module_like(self.raw_embedding)
         self.insert_sequential_module(self.backbone_model.get_encoder() if self.backbone_model.config.is_encoder_decoder else self.backbone_model,
                                           delta_module=soft_prompt_layer, 
-                                          name="soft_prompt_layer"  )
+                                          delta_name="soft_prompt_layer"  )
 
     def new_module_like(self, module):
         module_device = get_device(module)
-        soft_prompt_layer =  SoftPromptLayer(
+        soft_prompt_layer = SoftPromptLayer(
             soft_token_num = self.soft_token_num,
             raw_embedding = self.raw_embedding,
             token_init = self.token_init,

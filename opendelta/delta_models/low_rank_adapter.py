@@ -194,7 +194,7 @@ class LowRankAdapterModel(DeltaBase):
     def update_module(self, module: nn.Module, key: str):
         _, _, ref = self.find_module(module, key)
         adapterlayer = self.new_module_like(ref)
-        self.insert_sequential_module(ref, delta_module=adapterlayer, name="low_rank_adapter")
+        self.insert_sequential_module(ref, delta_module=adapterlayer, delta_name="low_rank_adapter")
     
     def new_module_like(self, module):
         module_device = get_device(module)

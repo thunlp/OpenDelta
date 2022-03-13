@@ -179,7 +179,7 @@ class BitFitModel(DeltaBase):
     
     def add_bias_to_others(self, c):
         new_bias = BiasLayer()
-        self.insert_sequential_module(c, delta_module=new_bias, name="bitfit") # name shouldn't be `bias` here, since
+        self.insert_sequential_module(c, delta_module=new_bias, delta_name="bitfit") # name shouldn't be `bias` here, since
                                         # the name `bias` is reserved for some module such as  roberta's LayerNorm.
         self.delta_modules.append(new_bias)
 
