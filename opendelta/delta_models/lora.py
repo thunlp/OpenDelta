@@ -66,8 +66,13 @@ class LoraConfig(BaseDeltaConfig):
 
 class LoraModel(DeltaBase):
     r""" The implementation of `LoRA: Low-Rank Adaptation of Large Language Models <https://arxiv.org/abs/2106.09685>`_ .
-    Thanks for their `loralib <https://github.com/microsoft/LoRA/tree/main/loralib>`_, we use loralib.linear 
-    to replace the linear layer of the backbone model. 
+    Thanks for their `loralib <https://github.com/microsoft/LoRA/tree/main/loralib>`_.
+    
+    .. note::
+        In our implementation, we did not use loralib.linear to replace the linear layer of the backbone model.
+        Instead, we insert a parallel module into the backbone.
+        In other words, we treat :math:`(W + A^TB) X` as :math:`WX+ A^TBX`, and insert the :math:`A^TBX` as a parallel insertion module. 
+        If you want to use the original implementation, please refer to `lora_old.py`
 
     class attributes:
         - default_modified_modules = ['attn.q', 'attn.v'] According to the paper, they modify q and v matrix in the

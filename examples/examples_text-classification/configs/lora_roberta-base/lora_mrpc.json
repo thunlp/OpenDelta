@@ -38,7 +38,8 @@
     "tokenizer_name": "roberta-base",
     "unfrozen_modules": [
         "classifier",
-        "deltas"
+        "deltas",
+        "layer_norm"
     ],
     "warmup_ratio": 0.06,
     "weight_decay": 0.1,
