@@ -102,7 +102,7 @@ class BitFitModel(DeltaBase):
                         the implemented ones)
         unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen
                          together with the prefix parameters.
-        common_structure (:obj:`bool`): whether using name-based addressing witha common structure mapping.
+        common_structure (:obj:`bool`): whether using name-based addressing with a common structure mapping.
 
     """
 
@@ -112,8 +112,8 @@ class BitFitModel(DeltaBase):
     default_modified_modules = ["attn", "ff", "layer_norm","lm_head.proj"] # modify all the bias parameter in attention and feed-forward layer.
     def __init__(self,
                  backbone_model: nn.Module, 
-                 modified_modules: Optional[bool] = None,
-                 unfrozen_modules: Optional[bool] = None,
+                 modified_modules: Optional[List[str]] = None,
+                 unfrozen_modules: Optional[List[str]] = None,
                  common_structure: Optional[bool] = None,
                  interactive_modify: Optional[Union[bool, int]] = False,
                  ):

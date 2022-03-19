@@ -453,7 +453,7 @@ class PrefixModel(DeltaBase):
                         the implemented ones)
         unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen
                          together with the prefix parameters.
-        common_structure (:obj:`bool`): whether using name-based addressing witha common structure mapping.
+        common_structure (:obj:`bool`): whether using name-based addressing with a common structure mapping.
 
     """
     config_class = PrefixConfig

@@ -92,7 +92,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
                  modified_modules: Optional[List[str]] = None,
                  unfrozen_modules: Optional[List[str]] = None,
                  interactive_modify: Optional[Union[bool, int]] = False,
-                 common_structure = False,
+                 common_structure: Optional[bool] = False,
                  ):
         nn.Module.__init__(self)
         # register the backbone model after init using self.__dict__ method to avoid adding backbone_model
