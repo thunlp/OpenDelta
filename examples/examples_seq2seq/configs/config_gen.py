@@ -46,6 +46,50 @@ BaseConfigs['t5-base'] = {
                 "save_strategy": "steps"
             }
 
+
+BaseConfigs['t5-xxl'] = {
+                ("job_name", "task_name", "eval_dataset_name", "test_dataset_name", "num_train_epochs", 
+                "max_source_length",
+                "per_device_train_batch_size", "per_device_eval_batch_size", "warmup_steps","save_steps", "eval_steps"): zip(
+                    ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record",
+                    "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"], 
+                    ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"], 
+                    ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"], 
+                    ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte", "mnli", "qqp", "stsb"],
+                    [ 20,  20,  40,  20,   3,   3,  20,  20,  20,   3,   3,  20,   3,   3,  20],
+                    [256, 256, 256, 256, 256, 512, 256, 128, 128, 128, 128, 128, 128, 128, 128],
+                    [ 32,  32,  32,  32,  32,  16,  32] + [4] * 8,
+                    [ 32,  32,  32,  32,  32,  16,  32] + [4] * 8,
+                    [0] *7 +[0] *8,
+                    [200, 100, 50, 100, 200, 200, 100, 200, 100, 200, 200, 100, 200, 200, 100],
+                    [200, 100, 50, 100, 200, 200, 100, 200, 100, 200, 200, 100, 200, 200, 100],
+                ),
+                "do_train": True,
+                "do_eval": True,
+                "do_test": True,
+                
+                "model_name_or_path": "/home/hushengding/plm_cache/t5-xxl-lm-adapt/",
+                "tokenizer_name": "/home/hushengding/plm_cache/t5-xxl-lm-adapt/",
+                "save_total_limit": 1,
+                # For glue datasets.
+                "split_validation_test": True,
+                "seed": 42,
+                "dataset_config_name": ["en"],
+                "eval_dataset_config_name": ["en"],
+                "test_dataset_config_name": ["en"],
+                # other configurations.
+                "predict_with_generate": True,
+                # To evaluate during training.
+                "load_best_model_at_end": True,
+                "metric_for_best_model": "average_metrics",
+                "greater_is_better": True,
+                "evaluation_strategy": "steps",
+                "overwrite_output_dir": True,
+                "push_to_hub": True,
+                "save_strategy": "steps",
+                "model_parallel": True
+            }
+
 AllConfigs['bitfit_t5-base'] = copy.deepcopy(BaseConfigs['t5-base'])
 AllConfigs['bitfit_t5-base'].update({
                 "delta_type": "bitfit",      
@@ -158,6 +202,21 @@ AllConfigs['low_rank_adapter_t5-base'].update({
                                     "final_layer_norm"
                                 ],
                                 "output_dir": "outputs/low_rank_adapter/t5-base/",
+                                "non_linearity": "gelu_new",
+                                "low_rank_w_init": "glorot-uniform", 
+                                "low_rank_rank": 1,
+                            })
+
+AllConfigs['low_rank_adapter_t5-xxl'] = copy.deepcopy(BaseConfigs['t5-xxl'])
+AllConfigs['low_rank_adapter_t5-xxl'].update({
+                                "delta_type": "low_rank_adapter",
+                                "learning_rate": 3e-4,
+                                "unfrozen_modules": [
+                                    "deltas",
+                                    "layer_norm",
+                                    "final_layer_norm"
+                                ],
+                                "output_dir": "outputs/low_rank_adapter/t5-xxl/",
                                 "non_linearity": "gelu_new",
                                 "low_rank_w_init": "glorot-uniform", 
                                 "low_rank_rank": 1,

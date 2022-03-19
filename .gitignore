@@ -20,3 +20,6 @@ log.txt
 *beans/
 **/examples/*/configs/
 !examples/*/configs/config_gen.py
+**/jupyter_notebook_examples/
+!examples/jupyter_notebook_examples/*.py
+

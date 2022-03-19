@@ -17,7 +17,7 @@ print(requires)
 with open('README.md', 'r') as f:
     setuptools.setup(
         name = 'opendelta',
-        version = '0.0.1',
+        version = '0.0.2',
         description = "An open source framework for delta learning (parameter efficient learning).",
         long_description=open("README.md", "r", encoding="utf-8").read(),
         long_description_content_type="text/markdown",
@@ -26,7 +26,7 @@ with open('README.md', 'r') as f:
         license="Apache",
         url="https://github.com/thunlp/OpenDelta",
         keywords = ['PLM', 'Parameter-efficient-Learning', 'AI', 'NLP'],
-        python_requires=">=3.8.0",
+        python_requires=">=3.6.0",
         install_requires=requires,
         packages=setuptools.find_packages(),
         classifiers=[
