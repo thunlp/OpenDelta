@@ -143,7 +143,7 @@ class LowRankAdapterModel(DeltaBase):
                         the implemented ones)
         unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen
                          together with the prefix parameters.
-        common_structure (:obj:`bool`, *optional*, default to :obj:`None`): whether using name-based addressing witha common structure mapping.
+        common_structure (:obj:`bool`, *optional*, default to :obj:`None`): whether using name-based addressing with a common structure mapping.
 
     """
 
@@ -156,8 +156,8 @@ class LowRankAdapterModel(DeltaBase):
                  non_linearity = "gelu_new",
                  low_rank_w_init = "glorot-uniform", 
                  low_rank_rank = 1,
-                 modified_modules: Optional[bool] = None,
-                 unfrozen_modules: Optional[bool] = None,
+                 modified_modules: Optional[List[str]] = None,
+                 unfrozen_modules: Optional[List[str]] = None,
                  common_structure: Optional[bool] = None,
                  interactive_modify: Optional[Union[bool, int]] = False,
                  ):

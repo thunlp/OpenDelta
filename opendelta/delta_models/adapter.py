@@ -181,7 +181,7 @@ class AdapterModel(DeltaBase):
                         the implemented ones)
         unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen
                          together with the prefix parameters.
-        common_structure (:obj:`bool`): whether using name-based addressing witha common structure mapping.
+        common_structure (:obj:`bool`): whether using name-based addressing with a common structure mapping.
 
     """
     config_class = AdapterConfig
@@ -192,8 +192,8 @@ class AdapterModel(DeltaBase):
                  bottleneck_dim: Optional[int]=24, 
                  non_linearity: Optional[str]='gelu_new',
                  sequential: Optional[str] = True,
-                 modified_modules: Optional[bool] = None,
-                 unfrozen_modules: Optional[bool] = None,
+                 modified_modules: Optional[List[str]] = None,
+                 unfrozen_modules: Optional[List[str]] = None,
                  common_structure: Optional[bool] = None,
                  interactive_modify: Optional[Union[bool, int]] = False,
                  ):
