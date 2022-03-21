@@ -48,6 +48,7 @@ BaseConfigs['t5-base'] = {
                 "save_strategy": "steps"
             }
 
+
 BaseConfigs['t5-large'] = {
                 ("job_name", "task_name", "eval_dataset_name", "test_dataset_name", "num_train_epochs", 
                 "max_source_length",
@@ -107,6 +108,7 @@ BaseConfigs['t5-3b'] = {
                     # [ 32,  32,  32,  32,  32,  16,  32] + [32] * 8,
                     [ 32,  32,  32,  32,  32,  16,  32] + [8] * 8,
                     [ 32,  32,  32,  32,  32,  16,  32] + [8] * 8,
+
                     [0] *7 +[0] *8,
                     [200, 100, 50, 100, 200, 200, 100, 200, 100, 200, 200, 100, 200, 200, 100],
                     [200, 100, 50, 100, 200, 200, 100, 200, 100, 200, 200, 100, 200, 200, 100],
@@ -114,7 +116,6 @@ BaseConfigs['t5-3b'] = {
                 "do_train": True,
                 "do_eval": True,
                 "do_test": True,
-                
                 "model_name_or_path": "/home/hushengding/plm_cache/t5-3b",
                 "tokenizer_name": "/home/hushengding/plm_cache/t5-3b",
                 "save_total_limit": 1,
@@ -250,6 +251,21 @@ AllConfigs['low_rank_adapter_t5-base'].update({
                                     "final_layer_norm"
                                 ],
                                 "output_dir": "outputs/low_rank_adapter/t5-base/",
+                                "non_linearity": "gelu_new",
+                                "low_rank_w_init": "glorot-uniform", 
+                                "low_rank_rank": 1,
+                            })
+
+AllConfigs['low_rank_adapter_t5-xxl'] = copy.deepcopy(BaseConfigs['t5-xxl'])
+AllConfigs['low_rank_adapter_t5-xxl'].update({
+                                "delta_type": "low_rank_adapter",
+                                "learning_rate": 3e-4,
+                                "unfrozen_modules": [
+                                    "deltas",
+                                    "layer_norm",
+                                    "final_layer_norm"
+                                ],
+                                "output_dir": "outputs/low_rank_adapter/t5-xxl/",
                                 "non_linearity": "gelu_new",
                                 "low_rank_w_init": "glorot-uniform", 
                                 "low_rank_rank": 1,

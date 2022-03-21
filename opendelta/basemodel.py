@@ -632,7 +632,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         self.config = config
         
     
-    def log(self, module=None, delta_ratio=True, trainable_ratio=True, visualization=True):
+    def log(self, module=None, delta_ratio=True, trainable_ratio=True, visualization=True, cuda_memory=True):
         r"""Log and visualize the result of applying delta. 
         Possible Options are ``trainable_ratio``,
         ``visualization``, ``delta_ratio``.
@@ -658,6 +658,15 @@ class DeltaBase(nn.Module, SaveLoadMixin):
             n_delta = self.num_delta_parameters(module)
             n_total = self.num_total_parameters(module)
             logger.info("Delta Parameter Ratio: {:2f}%".format(n_delta/n_total*100))
+        if cuda_memory:
+            cudamem = 0
+            maxcudamem = 0
+            for device_id in range(torch.cuda.device_count()):
+                cudamem += torch.cuda.memory_allocated(f"cuda:{device_id}")/1024**3
+                maxcudamem += torch.cuda.max_memory_allocated(f"cuda:{device_id}")/1024**3
+            logger.info("Static Memory {:.2f} GB, Max Memory {:.2f} GB".format(cudamem, maxcudamem))
+
+
 
     def num_delta_parameters(self, module: Optional[nn.Module]=None):
         r"""[NODOC] A small sugar function to get the number of trainable parameter in the backbone model. Often used to 
@@ -678,7 +687,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         return pnum_tot
         
     # Two functions for plug and remove the delta model.
-    def attach(self, module: Optional[nn.Module]=None,):
+    def attach(self, module: Optional[nn.Module]=None, reset_state_dict=True):
         r"""Reattach the delta modules to the backbone. Note that this method can not be used to create new delta modules.
         Instead, a :meth:`DeltaBase.detach` should precede this method. 
 
@@ -707,10 +716,13 @@ class DeltaBase(nn.Module, SaveLoadMixin):
                     else:
                         raise NotImplementedError
 
-                    _delta_info['state'] = "on"     
+                    _delta_info['state'] = "on"   
+        if reset_state_dict:
+            self.set_active_state_dict(module)
 
 
-    def detach(self, module: Optional[nn.Module]=None,):
+
+    def detach(self, module: Optional[nn.Module]=None, reset_state_dict=True):
         r"""Detach the delta module from the backbone. The delta module is not deleted, but temporarily turned off.
         Use :meth:`DeltaBase.attach` to reattach the delta model to the backbone.
 
@@ -743,4 +755,10 @@ class DeltaBase(nn.Module, SaveLoadMixin):
                         raise NotImplementedError
                     
                     _delta_info['state'] = "off"
+        if reset_state_dict:
+            try:
+                module.state_dict = module.state_dict.__wrapped__
+            except AttributeError:
+                pass
+        
 
