@@ -188,7 +188,7 @@ class CompacterModel(DeltaBase):
                         the implemented ones)
         unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen
                          together with the prefix parameters.
-        common_structure (:obj:`bool`, *optional*, default to :obj:`None`): whether using name-based addressing witha common structure mapping.
+        common_structure (:obj:`bool`, *optional*, default to :obj:`None`): whether using name-based addressing with a common structure mapping.
         reduction_factor (:obj:`int`, *optional*, default to ``16``): bottleneck_dim = hidden_dim//reduction_factor 
         non_linearity (:obj:`str`, *optional*, default to ``"gelu_new"``): The non linearity activation used in between the down 
                         projecter and the up projecter. 
@@ -216,8 +216,8 @@ class CompacterModel(DeltaBase):
     default_modified_modules = ["attn", "ff"]
     def __init__(self, 
                  backbone_model,
-                 modified_modules: Optional[bool] = None,
-                 unfrozen_modules: Optional[bool] = None,
+                 modified_modules: Optional[List[str]] = None,
+                 unfrozen_modules: Optional[List[str]] = None,
                  common_structure: Optional[bool] = None,
                  interactive_modify: Optional[Union[bool, int]] = False,
                  reduction_factor=16, 

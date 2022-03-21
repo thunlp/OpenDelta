@@ -134,13 +134,13 @@ class SoftPromptModel(DeltaBase):
     Args:
         backbone_model (:obj:`transformers.PretrainedModels`): The backbone model to be modified. 
         soft_token_num (:obj:`int`, *optional*): num of new tokens to add in the front of the input.
-        init_range (:obj:`bool`, *optional*): If initialize new tokens randomly, the random range of uniform distribution.
+        init_range (:obj:`float`, *optional*): If initialize new tokens randomly, the random range of uniform distribution.
         token_init (:obj:`bool`, *optional*, default to :obj:`True`): Whether to initialize the new tokens with tokens of the plm
         modified_modules (:obj:`List[str]`): For prefix tuning, the it must refer to an attention layer (Currently, only
                         the implemented ones)
         unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen
                          together with the prefix parameters.
-        common_structure (:obj:`bool`): whether using name-based addressing witha common structure mapping.
+        common_structure (:obj:`bool`): whether using name-based addressing with a common structure mapping.
 
     """
     config_class = SoftPromptConfig
@@ -151,8 +151,8 @@ class SoftPromptModel(DeltaBase):
                  soft_token_num=100,
                  init_range = 0.5,
                  token_init=True,
-                 modified_modules: Optional[bool] = None,
-                 unfrozen_modules: Optional[bool] = None,
+                 modified_modules: Optional[List[str]] = None,
+                 unfrozen_modules: Optional[List[str]] = None,
                  common_structure: Optional[bool] = None,
                  interactive_modify: Optional[Union[bool, int]] = False,
                 ):
