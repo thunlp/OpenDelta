@@ -6,7 +6,7 @@ from transformers.file_utils import PushToHubMixin
 from opendelta.utils.logging import get_logger
 import importlib
 from opendelta.delta_configs import BaseDeltaConfig
-
+from opendelta.basemodel import DeltaBase
 logger = get_logger(__name__)
 
 
@@ -325,7 +325,7 @@ class AutoDeltaModel:
         )
     
     @classmethod
-    def from_config(cls, config, backbone_model, **kwargs):
+    def from_config(cls, config, backbone_model, **kwargs): #-> "DeltaBase":
         r"""Automatically instantiates a delta model based on the :obj:`config`. The delta model correspond to the delta
         :obj:`config` will be loaded and initialized using the arguments in :obj:`config`. 
 

@@ -19,7 +19,20 @@ log.txt
 **/DeltaHub/
 *beans/
 **/examples/*/configs/
+
 !examples/*/configs/config_gen.py
 **/jupyter_notebook_examples/
 !examples/jupyter_notebook_examples/*.py
+
+
+!**/examples/*/configs/config_gen.py
+**/outputs_search/**/*.bin
+**/outputs_search/**/*.pt
+*.db
+**/nohup.out
+**/examples/examples_bmtrain/BigModels/down_data
+**/examples/examples_bmtrain/BMTrain_stable
+**/examples/examples_bmtrain/BMPretrain
+**/examples/examples_bmtrain/BigModels/BigModels/results
+**/Delta_Memory/
 

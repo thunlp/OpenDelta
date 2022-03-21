@@ -13,9 +13,33 @@ from opendelta.delta_models.layers.activations import Activations
 import inspect
 from opendelta import BaseDeltaConfig
 import opendelta.utils.logging as logging
+import numpy as np
+from opendelta import global_setting
 logger = logging.get_logger(__name__)
 
-class AdapterLayer(nn.Module):
+
+class InterFaceMixin:
+    def __init__(self):
+        self._axis_order = global_setting.axis_order
+        self._reverse_axis_order = np.argsort(self._axis_order).tolist()
+    
+    def _transpose(self, tensor):
+        return tensor.permute(*self._axis_order)
+    
+    def _reverse_transpose(self, tensor):
+        return tensor.permute(*self._reverse_axis_order).contiguous()
+    
+    def _convert_data_type(self, tensor):
+        self._data_type_record = tensor.dtype
+        self._device_record = tensor.device
+        return tensor.to(torch.float32).to(self._get_device())
+    
+    def _reverse_data_type(self, tensor):
+        return tensor.to(self._data_type_record).to(self._device_record)
+
+
+
+class AdapterLayer(nn.Module, InterFaceMixin):
     r"""A layer of adapter tuning module. 
     """
     layer_count = 0
@@ -30,23 +54,31 @@ class AdapterLayer(nn.Module):
 
     def __init__(self, bottleneck_dim=24, non_linearity='gelu_new', device=None):
         super().__init__()
+        InterFaceMixin.__init__(self)
         self.bottleneck_dim = bottleneck_dim
-        self.device = device
+        self.init_device = device
         self.instantiated = False
         self.non_linearity = non_linearity
         
         self.layer_id = AdapterLayer.get_layer_count()
         AdapterLayer.count_layer()
-        
+
+    
+
+    def _get_device(self):
+        if self.instantiated:
+            return self.modulelist.down_proj.weight.device
+        else:
+            return self.init_device
     
     def instantiate(self, hidden_dim):
         self.modulelist = nn.Sequential()
-        self.modulelist.add_module("down_proj",nn.Linear(hidden_dim, self.bottleneck_dim, device=self.device))
+        self.modulelist.add_module("down_proj",nn.Linear(hidden_dim, self.bottleneck_dim, device=self.init_device))
 
         # select non-linearity
         self.modulelist.add_module("non_linear", Activations(self.non_linearity.lower()))
 
-        self.modulelist.add_module("up_proj", nn.Linear(self.bottleneck_dim, self.hidden_dim,  device=self.device))
+        self.modulelist.add_module("up_proj", nn.Linear(self.bottleneck_dim, self.hidden_dim,  device=self.init_device))
 
         # TODO:
         # If we want to have a layer norm on output, we apply it later after a separate residual connection
@@ -77,6 +109,8 @@ class AdapterLayer(nn.Module):
         else:
             raise TypeError
 
+        hiddens = self._transpose(hiddens)
+        hiddens = self._convert_data_type(hiddens)
 
         if not self.instantiated:
             self.hidden_dim = hiddens.shape[-1]
@@ -86,6 +120,10 @@ class AdapterLayer(nn.Module):
 
         adapter_output = self.modulelist(hiddens)
         modified_output = adapter_output + hiddens # TODO option: disable residual_connection
+        
+        modified_output = self._reverse_transpose(modified_output)
+        modified_output = self._reverse_data_type(modified_output)
+
         if isinstance(output, tuple):
             output = (modified_output,) + output[1:]
         elif isinstance(output, torch.Tensor):

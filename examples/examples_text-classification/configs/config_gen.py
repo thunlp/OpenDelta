@@ -165,10 +165,17 @@ AllConfigs['lora_roberta-base'] = copy.deepcopy(BaseConfigs['roberta-base'])
 AllConfigs['lora_roberta-base'].update({
                                 "delta_type": "lora",
                                 "learning_rate": 3e-4,
+                                "common_structure": False,
+                                "modified_modules": ['attention.query'],
+                                # "unfrozen_modules": [
+                                #     "deltas",
+                                #     "layer_norm",
+                                #     "final_layer_norm",
+                                #     "classifier",
+                                # ],
                                 "unfrozen_modules": [
                                     "deltas",
-                                    "layer_norm",
-                                    "final_layer_norm",
+                                    "LayerNorm",
                                     "classifier",
                                 ],
                                 "lora_r": 8,

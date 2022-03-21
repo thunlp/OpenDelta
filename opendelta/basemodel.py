@@ -607,7 +607,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         # print(includes, "grad:",self.backbone_model.plm.lm_head.weight.requires_grad)
         # exit()
         if hasattr(module.state_dict, "__wrapped__"):
-            raise RuntimeWarning("The forward function might have been wrapped by a decorator, is it intended?")
+            raise RuntimeWarning("The forward function might have been wrapped by a decorator, is it intended? Do you freeze the parameters twice?")
         module.state_dict = decorate(module.state_dict, _caller, extras=(includes,), kwsyntax=True) # decorator.decorate helps preserving the functions metadata (signature, etc.).
     
     def _load_state_dict_into_backbone(self, backbone_model: nn.Module = None, state_dict: dict = {}):

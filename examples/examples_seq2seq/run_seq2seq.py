@@ -18,7 +18,7 @@ Fine-tuning the library models for sequence to sequence.
 # You can also adapt this script on your own sequence to sequence task. Pointers for this are left as comments.
 import functools
 import logging
-from opendelta.utils.delta_hub import create_hub_repo_name
+# from opendelta.utils.delta_center import create_hub_repo_name
 import torch 
 import os
 os.environ['MKL_THREADING_LAYER'] = 'GNU' 
@@ -49,6 +49,9 @@ from dataclasses import dataclass, field
 from transformers.models.t5.modeling_t5 import T5Config, T5ForConditionalGeneration
 from examples_seq2seq.trainers.model_args import ModelArguments
 from examples_seq2seq.trainers.trainer_args import TrainingArguments, DataTrainingArguments
+
+import tensorboardX 
+tb_writer = tensorboardX.SummaryWriter("Delta_Memory")
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +107,43 @@ class RemainArgHfArgumentParser(HfArgumentParser):
             return (*outputs, remain_args)
         else:
             return (*outputs,)
+
+from transformers.trainer_callback import TrainerCallback
+
+class MyCallback(TrainerCallback):
+    def __init__(self, *args, **kwargs):
+        self.delta_args = kwargs.pop("delta_args")
+        self.trainer_args = kwargs.pop("trainer_args")
+        self.model_args = kwargs.pop("model_args")
+        super(MyCallback, self).__init__(*args, **kwargs)
+        
+    
+    maxcudamem = 0
+    def on_step_end(self, args, state, control, **kwargs ):
+        glb_step = state.global_step
+        cudamem = 0
+        realcudamem =0
+        for device_id in range(torch.cuda.device_count()):
+            cudamem += torch.cuda.memory_allocated(f"cuda:{device_id}")/1024**3
+            realcudamem += torch.cuda.max_memory_allocated(f"cuda:{device_id}")/1024**3
+            torch.cuda.reset_peak_memory_stats(f"cuda:{device_id}")
+        self.maxcudamem = max(self.maxcudamem, realcudamem)
+        self.cudamem = cudamem
+        # self.tb_writer.add_scalar("Static Memory (GB)", cudamem, glb_step)
+        # self.tb_writer.add_scalar("Runtime Memory (GB)", realcudamem, glb_step)
+        # self.tb_writer.add_scalar("Peak Memory (GB)", self.maxcudamem, glb_step)
+        if glb_step > 50:
+            content = f"{self.delta_args.delta_type}\t{self.trainer_args.per_device_train_batch_size}\t{self.model_args.model_name_or_path}\t{self.cudamem}\t{self.maxcudamem}\n"
+            with open("memory_data.txt", 'a') as fout:
+                fout.write(content)
+            exit()
+
+            
+
+
+        
+    
+
 
 
 def main():
@@ -214,9 +254,9 @@ def main():
 
 
     # model parallelize
-    if hasattr(training_args, "model_parallel") and training_args.model_parallel:
-        logger.info('parallelize model!')
-        model.parallelize()
+    # if hasattr(training_args, "model_parallel") and training_args.model_parallel:
+    #     logger.info('parallelize model!')
+    model.parallelize()
 
     data_args.dataset_name = [data_args.task_name]
     data_args.eval_dataset_name = [data_args.eval_dataset_name]
@@ -368,6 +408,8 @@ def main():
         compute_metrics=compute_metrics if training_args.predict_with_generate else None,
         evaluation_metrics = TASK_TO_METRICS[data_args.dataset_name[0]],
     )
+
+    trainer.add_callback(MyCallback(trainer_args=training_args, delta_args=delta_args, model_args=model_args))
 
 
     # Saves training config. 
