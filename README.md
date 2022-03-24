@@ -32,9 +32,10 @@ OpenDelta is a toolkit for parameter efficient methods (we dub it as *delta tuni
 ![How PLM changes using Delta-tuning](docs/source/imgs/demo.gif)
 
 ## Updates
-- 2022.03.20 add a [colab example](https://colab.research.google.com/drive/1hM_zu11s6plpK-YQSkz3CrowJyxtHneY?usp=sharing) to illustrate efficient training and space-saving multitask-serving.
-- 2022.03.20 a new pip version released.
-- 2022.02.16 support [regular expression](https://opendelta.readthedocs.io/en/latest/notes/namebasedaddr.html#regexexpr) in named-based addressing. 
+- 2022.03.24 We notice several bugs in Soft Prompt Tuning and Prefix Tuning, mainly due to their need to customize attention ids, token_type_ids, we are fixing it! Currently, please use the other methods since they are stabler and better in performance. 
+- 2022.03.20 Add a [colab example](https://colab.research.google.com/drive/1hM_zu11s6plpK-YQSkz3CrowJyxtHneY?usp=sharing) to illustrate efficient training and space-saving multitask-serving.
+- 2022.03.20 A new pip version released.
+- 2022.02.16 Support [regular expression](https://opendelta.readthedocs.io/en/latest/notes/namebasedaddr.html#regexexpr) in named-based addressing. 
 
 ## Installation
 create a virtualenv (optional)
