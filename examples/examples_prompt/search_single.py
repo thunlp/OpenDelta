@@ -20,11 +20,14 @@ def objective_singleseed(args, unicode, search_space_sample  ):
     with open(f"{args.output_dir}/{unicode}/this_configs.json", 'w') as fout:
         json.dump(search_space_sample, fout, indent=4,sort_keys=True)
     
+
     command = "CUDA_VISIBLE_DEVICES={} ".format(args.cuda_id)
     command += "python run.py "
     command += f"{args.output_dir}/{unicode}/this_configs.json"
+    command += f" >> {args.output_dir}/{unicode}/output.log 2>&1"
     
 
+    print("======"*5+"\n"+command)
     status_code = os.system(command)
     print("status_code",status_code)
     # if status_code != 0:
@@ -61,7 +64,7 @@ def objective(trial, args=None):
     search_space_sample.update(DatasetSearchSpace(args.dataset).get_config(trial, args))
     search_space_sample.update(AllDeltaSearchSpace[args.delta_type]().get_config(trial, args))
     results = []
-    for seed in [100]:
+    for seed in [42,43,44]:
         search_space_sample.update({"seed": seed})
         unicode = random.randint(0, 100000000)
         while os.path.exists(f"{args.output_dir}/{unicode}"):
@@ -84,10 +87,11 @@ if __name__=="__main__":
     parser.add_argument("--study_name")
     parser.add_argument("--num_trials", type=int)
     parser.add_argument("--optuna_seed", type=int, default="the seed to sample suggest point")
+    parser.add_argument("--pathbase", type=str, default="")
     args = parser.parse_args()
 
         
-    setattr(args, "output_dir", f"outputs_search/{args.study_name}")
+    setattr(args, "output_dir", f"{args.pathbase}/outputs_search/{args.study_name}")
 
     study = optuna.load_study(study_name=args.study_name, storage=f'sqlite:///{args.study_name}.db', sampler=TPESampler(seed=args.optuna_seed))
     study.optimize(partial(objective, args=args), n_trials=args.num_trials)

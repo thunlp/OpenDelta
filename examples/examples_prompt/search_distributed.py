@@ -18,6 +18,7 @@ if __name__=="__main__":
     parser.add_argument("--continue_study", type=bool, default=False)
     parser.add_argument("--substudy_prefix", type=str, default="")
     parser.add_argument("--num_trials", type=int)
+    parser.add_argument("--pathbase", type=str, default="")
     args = parser.parse_args()
 
 
@@ -27,7 +28,7 @@ if __name__=="__main__":
     else:
         args.study_name += pardir
     
-    setattr(args, "output_dir", f"outputs_search/{args.study_name}")
+    setattr(args, "output_dir", f"{args.pathbase}/outputs_search/{args.study_name}")
 
     
     
@@ -68,7 +69,7 @@ if __name__=="__main__":
             else:
                 sub_n_trials = args.num_trials//tot_chunk_num + args.num_trials%tot_chunk_num
 
-            command = "nohup python search_single.py "
+            command = "python search_single.py "
             command += f"--cuda_id {cudas} "
             command += f"--model_name {args.model_name} "
             command += f"--dataset {args.dataset} "
@@ -76,7 +77,7 @@ if __name__=="__main__":
             command += f"--study_name {args.study_name} "
             command += f"--optuna_seed 10{id} "
             command += f"--num_trials {sub_n_trials} "
-            command += f">{args.output_dir}/{args.substudy_prefix}{id}.log 2>&1 &"
+            command += f"> {args.output_dir}/{args.substudy_prefix}{id}.log 2>&1 &"
             p = subprocess.Popen(command, cwd="./", shell=True)
             print("id {} on cuda:{}, pid {}\n {}\n".format(id, cudas, p.pid, command))
 

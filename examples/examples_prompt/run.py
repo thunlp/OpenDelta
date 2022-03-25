@@ -280,6 +280,7 @@ def main():
                 load_from_cache_file=not data_args.overwrite_cache,
             )
         train_dataset = concatenate_datasets(train_datasets)
+        print(f"Train dataset size {len(train_dataset)}")
    
     if training_args.do_eval:
         eval_datasets = {eval_dataset: AutoTask.get(eval_dataset, eval_dataset_config,
