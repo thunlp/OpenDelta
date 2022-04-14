@@ -28,7 +28,6 @@ class LowRankLinear(nn.Module):
         self.r = r
         self.lora_alpha = lora_alpha
         self.lora_dropout = lora_dropout
-        self.lin = nn.Linear(in_features, out_features) #
         if lora_dropout > 0.:
             self.lora_dropout = nn.Dropout(p=lora_dropout)
         else:
@@ -37,7 +36,6 @@ class LowRankLinear(nn.Module):
             self.lora_A = nn.Parameter(weight.new_zeros((r, in_features)))
             self.lora_B = nn.Parameter(weight.new_zeros((out_features, r)))
             self.scaling = self.lora_alpha / self.r
-            self.lin.reset_parameters() #
             nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
             nn.init.zeros_(self.lora_B)
 
