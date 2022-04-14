@@ -17,26 +17,26 @@ class SoftPromptConfig(BaseDeltaConfig):
 
     """
     def __init__(
-        self, 
+        self,
         soft_token_num=100,
         init_range = 0.5,
         token_init = True,
         **kwargs
-    ): 
+    ):
         super().__init__(**kwargs)
         arg_names = get_arg_names_inside_func(self.__init__)
         for arg_name in arg_names:
             if not hasattr(self, arg_name): # the arg has not been registered in parent config
                 setattr(self, arg_name, locals()[arg_name])
 
-        
+
 
 class SoftPromptLayer(nn.Module):
     r"""This is the implementation of `The Power of Scale for Parameter-Efficient
     Prompt Tuning <https://arxiv.org/pdf/2104.08691v1.pdf>`_ . Similar to :obj:`PrefixTuningTemplate`,
     This template also does not need any textual template. Addition tokens are directly
-    concatenated into the input ids. There are two initializations of the new tokens. 
-    (1). random initialization. (2) initialize with the tokens of the plm (We simply take 
+    concatenated into the input ids. There are two initializations of the new tokens.
+    (1). random initialization. (2) initialize with the tokens of the plm (We simply take
     the first n_tokens similar to their implementation).
 
     Note that this template can be simply achieved by :obj:`SoftManualTemplate`, in which
@@ -53,19 +53,19 @@ class SoftPromptLayer(nn.Module):
                 ):
         super().__init__()
         self.__dict__['raw_embedding'] = raw_embedding
-        
+
         self.init_range = init_range
         self.num_tokens = soft_token_num
         self.pad_id = pad_id
         self.token_init = token_init
         self.device = device
-    
+
         assert self.num_tokens>0
         self.instantiate(raw_embedding(torch.tensor([0])).shape[-1])
 
     def pre_forward(self, *args, **kwargs):
         # if attention_mask is passed as PLM's input, modify it here
-        if 'encoder_outputs' in kwargs and kwargs['encoder_outputs'] is not None: 
+        if 'encoder_outputs' in kwargs and kwargs['encoder_outputs'] is not None:
             # In generation, the input is forward through the model again.
             return args, kwargs
 
@@ -84,7 +84,7 @@ class SoftPromptLayer(nn.Module):
             if input_ids is None:
                 raise RuntimeError("no input ids found")
             kwargs['attention_mask'] = (input_ids != self.pad_id).to(torch.int64)
-            
+
         if 'inputs_embeds' not in kwargs or kwargs['inputs_embeds'] is None:
             try:
                 inputs_embeds = self.raw_embedding(input_ids)
@@ -92,9 +92,9 @@ class SoftPromptLayer(nn.Module):
                 raise RuntimeError("neither inputs_embeds nor input_ids is specified.")
         else:
             inputs_embeds = kwargs['inputs_embeds']
-            
-        
-        
+
+
+
         batch_size = inputs_embeds.size(0)
         soft_embeds = self.soft_embeds.repeat(batch_size, 1, 1)
         inputs_embeds = torch.cat([soft_embeds, inputs_embeds], 1)
@@ -124,15 +124,15 @@ class SoftPromptModel(DeltaBase):
     This is the implementation of `The Power of Scale for Parameter-Efficient
     Prompt Tuning <https://arxiv.org/pdf/2104.08691v1.pdf>`_ . Similar to :obj:`PrefixTuningTemplate`,
     This template also does not need any textual template. Addition tokens are directly
-    concatenated into the input ids. There are two initializations of the new tokens. 
-    (1). random initialization. (2) initialize with the tokens of the plm (We simply take 
+    concatenated into the input ids. There are two initializations of the new tokens.
+    (1). random initialization. (2) initialize with the tokens of the plm (We simply take
     the first n_tokens similar to their implementation).
 
     Note that this template can be simply achieved by :obj:`SoftManualTemplate`, in which
     you set ``n_token`` <soft> tokens template before the <text_a> will give the same result.
 
     Args:
-        backbone_model (:obj:`transformers.PretrainedModels`): The backbone model to be modified. 
+        backbone_model (:obj:`transformers.PretrainedModels`): The backbone model to be modified.
         soft_token_num (:obj:`int`, *optional*): num of new tokens to add in the front of the input.
         init_range (:obj:`float`, *optional*): If initialize new tokens randomly, the random range of uniform distribution.
         token_init (:obj:`bool`, *optional*, default to :obj:`True`): Whether to initialize the new tokens with tokens of the plm
@@ -146,19 +146,21 @@ class SoftPromptModel(DeltaBase):
     config_class = SoftPromptConfig
     delta_type = "soft_prompt"
     default_modified_modules = ["root"]  # not used
-    def __init__(self, 
+    def __init__(self,
                  backbone_model: nn.Module,
                  soft_token_num=100,
                  init_range = 0.5,
                  token_init=True,
                  modified_modules: Optional[List[str]] = None,
+                 exclude_modules: Optional[List[str]] = None,
                  unfrozen_modules: Optional[List[str]] = None,
                  common_structure: Optional[bool] = None,
                  interactive_modify: Optional[Union[bool, int]] = False,
                 ):
-        DeltaBase.__init__(self, 
+        DeltaBase.__init__(self,
                            backbone_model = backbone_model,
                            modified_modules = ["root"],
+                           exclude_modules = exclude_modules,
                            unfrozen_modules = unfrozen_modules,
                            common_structure = False,
                            interactive_modify = interactive_modify,
@@ -175,24 +177,24 @@ class SoftPromptModel(DeltaBase):
         except AttributeError:
             raise AttributeError(f"'{type(self.backbone_model)}' object has no attribute 'get_input_embeddings', please pass "+
             "input embeddings into 'self.raw_embedding' in user-specific ways.")
-        
+
         self.delta_modules = nn.ModuleList()
         self.add_all_delta_to_backbone(self.backbone_model,
                                        self.modified_modules,
                                       )
 
-    def add_all_delta_to_backbone(self, 
-                 module: nn.Module, 
+    def add_all_delta_to_backbone(self,
+                 module: nn.Module,
                  modified_modules: List[str],
                 ) -> nn.Module:
         self.update_module()
         self.mark_as_delta()
         return module
-    
+
     def update_module(self):
         soft_prompt_layer = self.new_module_like(self.raw_embedding)
         self.insert_sequential_module(self.backbone_model.get_encoder() if self.backbone_model.config.is_encoder_decoder else self.backbone_model,
-                                          delta_module=soft_prompt_layer, 
+                                          delta_module=soft_prompt_layer,
                                           delta_name="soft_prompt_layer"  )
 
     def new_module_like(self, module):
@@ -204,6 +206,5 @@ class SoftPromptModel(DeltaBase):
             init_range = self.init_range,
             device = module_device,
         )
-        self.delta_modules.append(soft_prompt_layer)  
+        self.delta_modules.append(soft_prompt_layer)
         return soft_prompt_layer
-    

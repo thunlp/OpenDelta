@@ -1,4 +1,4 @@
-import collections 
+import collections
 import copy
 
 
@@ -10,7 +10,7 @@ class BaseSearchSpace:
                 "do_train": True,
                 "do_eval": True,
                 "do_test": True,
-                
+
 
                 "save_total_limit": 1,
                 # For glue datasets.
@@ -19,7 +19,6 @@ class BaseSearchSpace:
                 "eval_dataset_config_name": ["en"],
                 "test_dataset_config_name": ["en"],
                 # other configurations.
-                "predict_with_generate": True,
                 # To evaluate during training.
                 "load_best_model_at_end": True,
                 "metric_for_best_model": "average_metrics",
@@ -27,7 +26,10 @@ class BaseSearchSpace:
                 "evaluation_strategy": "steps",
                 "overwrite_output_dir": True,
                 "push_to_hub": False,
-                "save_strategy": "steps"
+                "save_strategy": "steps",
+                "datasets_load_from_disk": args.datasets_load_from_disk,
+                "datasets_saved_path": args.datasets_saved_path
+
             }
 
 
@@ -37,7 +39,7 @@ class BitFitSearchSpace:
         learning_rate = trail.suggest_loguniform('learning_rate', 1e-5, 1e-1)
         return {
             "delta_type": "bitfit",
-            'learning_rate': learning_rate, 
+            'learning_rate': learning_rate,
         }
 
 class AdapterSearchSpace:
@@ -68,7 +70,7 @@ class FinetuneSearchSpace:
         learning_rate = trail.suggest_loguniform('learning_rate', 1e-5, 1e-1)
         return {
             "delta_type": "none",
-            'learning_rate': learning_rate, 
+            'learning_rate': learning_rate,
         }
 
 class LoRASearchSpace:
@@ -100,16 +102,16 @@ class CompacterSearchSpace:
                 "non_linearity": "gelu_new",
 
                 #Compacter.
-                "hypercomplex_division": 4, 
+                "hypercomplex_division": 4,
                 "hypercomplex_adapters": True,
                 "hypercomplex_nonlinearity": "glorot-uniform",
-                # gradient clip and clamp 
+                # gradient clip and clamp
                 "gradient_clip": False,
                 "phm_clamp": False,
-                "normalize_phm_weight": False, 
+                "normalize_phm_weight": False,
                 "learn_phm": True,
-                # shared one side 
-                "factorized_phm": True, 
+                # shared one side
+                "factorized_phm": True,
                 "shared_phm_rule": False,
                 "factorized_phm_rule": False,
                 "phm_c_init": "normal",
@@ -140,16 +142,16 @@ class CompacterppSearchSpace:
                 "non_linearity": "gelu_new",
 
                 #Compacter.
-                "hypercomplex_division": 4, 
+                "hypercomplex_division": 4,
                 "hypercomplex_adapters": True,
                 "hypercomplex_nonlinearity": "glorot-uniform",
-                # gradient clip and clamp 
+                # gradient clip and clamp
                 "gradient_clip": False,
                 "phm_clamp": False,
-                "normalize_phm_weight": False, 
+                "normalize_phm_weight": False,
                 "learn_phm": True,
-                # shared one side 
-                "factorized_phm": True, 
+                # shared one side
+                "factorized_phm": True,
                 "shared_phm_rule": False,
                 "factorized_phm_rule": False,
                 "phm_c_init": "normal",
@@ -171,7 +173,7 @@ class LowRankAdapterSearchSpace:
                         "final_layer_norm"
                     ],
                     "non_linearity": "gelu_new",
-                    "low_rank_w_init": "glorot-uniform", 
+                    "low_rank_w_init": "glorot-uniform",
                     "low_rank_rank": low_rank_rank,
                 }
 
@@ -201,8 +203,8 @@ class T5BaseSearchSpace:
         batch_size =  int(16 * 2**(min(batch_size_base,3)-1))
         warmup_steps = trail.suggest_categorical('warmup_steps', [0, 500])
         return {
-            "model_name_or_path": "t5-base", # change here for loading from custom path
-            "tokenizer_name": "t5-base",   # change here for loading from custom path
+            "model_name_or_path": f"{args.plm_path_base}t5-base", # change here for loading from custom path
+            "tokenizer_name": f"{args.plm_path_base}t5-base",   # change here for loading from custom path
             'batch_size':batch_size,
             "per_device_train_batch_size": batch_size,
             "per_device_eval_batch_size": batch_size,
@@ -211,17 +213,43 @@ class T5BaseSearchSpace:
             "save_steps": 200,
             "eval_steps": 200,
             "max_steps": 5000,
+            "predict_with_generate": True,
         }
 
 
+class RobertaBaseSearchSpace:
+    def get_config(self, trail, args=None):
+        batch_size_base = trail.suggest_int('batch_size_base', 1, 4)
+        if batch_size_base >= 4:
+            gradient_accumulation_steps = 2**(batch_size_base-3)
+        else:
+            gradient_accumulation_steps = 1
+        batch_size =  int(16 * 2**(min(batch_size_base,3)-1))
+        warmup_steps = trail.suggest_categorical('warmup_steps', [0, 500])
+        return {
+            "model_name_or_path": f"{args.plm_path_base}roberta-base", # change here for loading from custom path
+            "tokenizer_name": f"{args.plm_path_base}roberta-base",   # change here for loading from custom path
+            'batch_size':batch_size,
+            "per_device_train_batch_size": batch_size,
+            "per_device_eval_batch_size": batch_size,
+            "warmup_steps": warmup_steps,
+            "gradient_accumulation_steps": gradient_accumulation_steps,
+            "save_steps": 200,
+            "eval_steps": 200,
+            "max_steps": 5000,
+            "predict_with_generate": False,
+        }
+
+
+
 class DatasetSearchSpace:
-    dataset_order = ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"]
-    dataset_config = {("task_name", "eval_dataset_name", "test_dataset_name", 
+    dataset_order = ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb", "wnli"]
+    dataset_config = {("task_name", "eval_dataset_name", "test_dataset_name",
     "max_source_length"): list(zip(
-        ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"], 
-        ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"], 
-        ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte", "mnli", "qqp", "stsb"],
-        [256, 256, 256, 256, 256, 512, 256, 128, 128, 128, 128, 128, 128, 128, 128],
+        ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb", "wnli"],
+        ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb", "wnli"],
+        ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte", "mnli", "qqp", "stsb", "wnli"],
+        [256, 256, 256, 256, 256, 512, 256, 128, 128, 128, 128, 128, 128, 128, 128, 128],
     ))}
     def __init__(self, dataset_name):
         self.dataset_name = dataset_name
@@ -250,6 +278,7 @@ AllDeltaSearchSpace = {
 }
 
 AllBackboneSearchSpace = {
-    "t5-base": T5BaseSearchSpace
+    "t5-base": T5BaseSearchSpace,
+    "roberta-base": RobertaBaseSearchSpace,
 }
 

@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Optional, List
-from transformers import Seq2SeqTrainingArguments 
+from transformers import Seq2SeqTrainingArguments
 # run_seq2seq parameters.
 
 @dataclass
@@ -19,7 +19,7 @@ class TrainingArguments(Seq2SeqTrainingArguments):
     compute_time: Optional[bool] = field(default=False, metadata={"help": "If set measures the time."})
     compute_memory: Optional[bool] = field(default=False, metadata={"help": "if set, measures the memory"})
     is_seq2seq: Optional[bool] = field(default=True, metadata={"help": "whether the pipeline is a seq2seq one"})
-    
+
 
 
 
@@ -128,8 +128,16 @@ class DataTrainingArguments:
         default=None,
         metadata={"help": "Defines a dictionary from tasks to the tasks embeddings."}
     )
+    datasets_load_from_disk: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to load datasets from disk"}
+    )
+    datasets_saved_path: Optional[str] = field(
+        default=None, metadata={"help": "the path of the saved datasets"}
+    )
+
     data_seed: Optional[int] = field(default=42, metadata={"help": "seed used to shuffle the data."})
-    
+
+
     model_parallel: Optional[bool] = field(default=False, metadata={"help": "whether apply model parallelization"})
 
     def __post_init__(self):
