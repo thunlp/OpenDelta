@@ -3,7 +3,7 @@ data/
 logs/*
 experiments/logs
 !logs/.gitkeep
-datasets/* 
+datasets/*
 !datasets/*.sh
 .vscode/
 *.egg-info/
@@ -28,6 +28,7 @@ log.txt
 !**/examples/*/configs/config_gen.py
 **/outputs_search/**/*.bin
 **/outputs_search/**/*.pt
+
 *.db
 **/nohup.out
 **/examples/examples_bmtrain/BigModels/down_data
