@@ -1,7 +1,7 @@
-cd configs/
-python config_gen.py --job $3
+
+python configs/config_gen.py --job $3
 echo "Regenerate config"
-cd ../
+
 files=(cola mnli mrpc qnli qqp rte sst2 stsb superglue-boolq superglue-cb superglue-copa superglue-multirc superglue-record superglue-wic superglue-wsc.fixed)
 for ((i=$1; i<=$2; i++))
 do

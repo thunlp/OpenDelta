@@ -12,12 +12,12 @@ def string_to_float(string, default=-1., **unused_kwargs):
     return default
 
 
-class PostProcessor(abc.ABC): 
+class PostProcessor(abc.ABC):
     """Postprocess the predictions and labels to make them suitable for
     evaluation."""
     def __init__(self, tokenizer, ignore_pad_token_for_loss):
-       self.tokenizer = tokenizer 
-       self.ignore_pad_token_for_loss = ignore_pad_token_for_loss 
+       self.tokenizer = tokenizer
+       self.ignore_pad_token_for_loss = ignore_pad_token_for_loss
 
 
     def process(self, preds, labels, data_info=None):
@@ -31,23 +31,23 @@ class PostProcessor(abc.ABC):
         # Some simple post-processing
         decoded_preds = [pred.strip() for pred in decoded_preds]
         decoded_labels = [label.strip() for label in decoded_labels]
-        return decoded_preds, decoded_labels 
+        return decoded_preds, decoded_labels
 
 
 class MultiRC(PostProcessor):
     def process(self, preds, labels, data_info):
-        preds, labels = super().process(preds, labels, data_info) 
+        preds, labels = super().process(preds, labels, data_info)
         preds = [{"group": info["group"], "value":pred} \
             for info, pred in zip(data_info, preds)]
         labels = [{"group": info["group"], "value": label}\
-            for info, label in zip(data_info, labels)] 
-        return preds, labels 
+            for info, label in zip(data_info, labels)]
+        return preds, labels
 
 class Record(PostProcessor):
     def process(self, preds, labels, data_info):
-        preds, labels = super().process(preds, labels, data_info) 
+        preds, labels = super().process(preds, labels, data_info)
         labels = [info["answers"] for info in data_info]
-        return preds, labels 
+        return preds, labels
 
 
 POSTPROCESSOR_MAPPING = OrderedDict(
@@ -63,5 +63,5 @@ class AutoPostProcessor:
         if task in POSTPROCESSOR_MAPPING:
             return POSTPROCESSOR_MAPPING[task](tokenizer, ignore_pad_token_for_loss)
         return PostProcessor(tokenizer, ignore_pad_token_for_loss)
-    
+
 

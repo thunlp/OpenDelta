@@ -1,3 +1,4 @@
+from examples_prompt.metrics.metrics import exact_match
 from opendelta.utils.signature import get_arg_names, get_arg_names_inside_func
 from opendelta.utils.name_based_addressing import *
 from opendelta.utils.cuda import get_device
@@ -47,6 +48,7 @@ class SoftPromptLayer(nn.Module):
                  soft_token_num: int = 100,
                  raw_embedding: Optional[torch.Tensor] = None,
                  init_range: Optional[float] = 0.5,
+                 other_expand_ids: Optional[Dict] = {"attention_mask":1, "token_type_ids":0},
                  token_init = False,
                  pad_id = 0,
                  device: Optional[str]=None,
@@ -59,9 +61,12 @@ class SoftPromptLayer(nn.Module):
         self.pad_id = pad_id
         self.token_init = token_init
         self.device = device
+        self.other_expand_ids = other_expand_ids
 
         assert self.num_tokens>0
         self.instantiate(raw_embedding(torch.tensor([0])).shape[-1])
+
+        self.all_pseudo_tokens = {}
 
     def pre_forward(self, *args, **kwargs):
         # if attention_mask is passed as PLM's input, modify it here
@@ -100,8 +105,19 @@ class SoftPromptLayer(nn.Module):
         inputs_embeds = torch.cat([soft_embeds, inputs_embeds], 1)
         kwargs['inputs_embeds'] = inputs_embeds
 
-        am = kwargs['attention_mask']
-        am.data = torch.cat([torch.ones((*am.shape[:-1], inputs_embeds.shape[-2]-am.shape[-1]), dtype = am.dtype,device=am.device), am], dim=-1)
+        for expand_key in self.other_expand_ids:
+            if expand_key in kwargs:
+                real_tokens = kwargs[expand_key]
+                if expand_key in self.all_pseudo_tokens:
+                    pseudo_tokens = self.all_pseudo_tokens[expand_key].to(real_tokens.device)
+                else:
+                    pseudo_tokens_value = self.other_expand_ids[expand_key]
+                    pseudo_tokens = torch.ones(
+                        (*real_tokens.shape[:-1], inputs_embeds.shape[-2]-real_tokens.shape[-1]),
+                        dtype = real_tokens.dtype,
+                        device=real_tokens.device) * pseudo_tokens_value
+                    self.all_pseudo_tokens[expand_key] = pseudo_tokens
+                real_tokens.data = torch.cat([pseudo_tokens, real_tokens], dim=-1)
 
         return args, kwargs
 
@@ -136,6 +152,10 @@ class SoftPromptModel(DeltaBase):
         soft_token_num (:obj:`int`, *optional*): num of new tokens to add in the front of the input.
         init_range (:obj:`float`, *optional*): If initialize new tokens randomly, the random range of uniform distribution.
         token_init (:obj:`bool`, *optional*, default to :obj:`True`): Whether to initialize the new tokens with tokens of the plm
+        other_expand_ids (:obj:`dict`, *optional*, default to `{"attention_mask":1, "token_type_ids":0}`) The name of
+                        other tokens and its default value that expand along with the input sequence. For example, when
+                        you prepend 100 tokens to the input_ids, the attention_mask should be extended, and the token_type_ids should
+                        be extended as well.
         modified_modules (:obj:`List[str]`): For prefix tuning, the it must refer to an attention layer (Currently, only
                         the implemented ones)
         unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen
@@ -151,6 +171,7 @@ class SoftPromptModel(DeltaBase):
                  soft_token_num=100,
                  init_range = 0.5,
                  token_init=True,
+                 other_expand_ids={"attention_mask":1, "token_type_ids":0},
                  modified_modules: Optional[List[str]] = None,
                  exclude_modules: Optional[List[str]] = None,
                  unfrozen_modules: Optional[List[str]] = None,
@@ -202,6 +223,7 @@ class SoftPromptModel(DeltaBase):
         soft_prompt_layer = SoftPromptLayer(
             soft_token_num = self.soft_token_num,
             raw_embedding = self.raw_embedding,
+            other_expand_ids = self.other_expand_ids,
             token_init = self.token_init,
             init_range = self.init_range,
             device = module_device,

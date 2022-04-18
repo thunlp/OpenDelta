@@ -15,6 +15,7 @@ import re
 from openprompt.prompts import ManualTemplate, ManualVerbalizer
 from openprompt.plms.utils import TokenizerWrapper
 from openprompt.data_utils import InputExample
+from openprompt.prompts import GenerationVerbalizer
 import itertools
 
 
@@ -28,184 +29,170 @@ from typing import List, Dict
 from collections import defaultdict
 from openprompt.utils import round_list
 import warnings
-class MLMTokenizerWrapper:
-    def __init__(self, max_seq_length, tokenizer, truncate_method):
-        self.max_seq_length=max_seq_length
-        self.tokenizer=tokenizer
-        self.num_special_tokens_to_add = len(tokenizer("")['input_ids'])
-        # from IPython import embed; embed(header="Truega")
-        self.truncate_method=truncate_method
-        self.total_passed_sentences = 0
-        self.num_truncated_sentences = 0
-        if truncate_method=='tail':
-            self.truncate_fct = self.truncate_from_tail
-        elif truncate_method=='head':
-            self.truncate_fct = self.truncate_from_head
-        elif truncate_method == 'balanced':
-            self.truncate_fct = self.balanced_truncate
-        else:
-            raise NotImplementedError
+
+# class MLMTokenizerWrapper:
+#     def __init__(self, max_seq_length, tokenizer, truncate_method, mask_token_func=lambda i: "<mask>"):
+#         self.max_seq_length=max_seq_length
+#         self.tokenizer=tokenizer
+#         self.num_special_tokens_to_add = len(tokenizer("")['input_ids'])
+#         # from IPython import embed; embed(header="Truega")
+#         self.truncate_method=truncate_method
+#         self.total_passed_sentences = 0
+#         self.num_truncated_sentences = 0
+#         self.mask_token_func = mask_token_func
+
+#         if truncate_method=='tail':
+#             self.truncate_fct = self.truncate_from_tail
+#         elif truncate_method=='head':
+#             self.truncate_fct = self.truncate_from_head
+#         elif truncate_method == 'balanced':
+#             self.truncate_fct = self.balanced_truncate
+#         else:
+#             raise NotImplementedError
+
+
+#     def merge_wrapped_example(self, wrapped_example,):
+#         ''' # TODO doens't consider the situation that input has two parts
+#         '''
+
+#         wrapped_example
+
+#         # for some dataset like SuperGLUE.COPA, the answer requires prediction an span of
+#         # the input. Or in generation tasks, we need to generate a piece of target_text.
+#         # In these case, it tokenized to the encoded_tgt_text for furture use.
 
 
 
+#         encoder_inputs = defaultdict(list)
+#         # from IPython import embed; embed(header="Line 67")
+
+#         mask_count = 0
+#         for piece in wrapped_example:
+#             if piece['text'] == "<mask>":
+#                 encode_text = self.tokenizer.encode(self.mask_token_func(mask_count), add_special_tokens=False, return_special_tokens_mask=True )
+#                 mask_count += 1
+#             else:
+#                 encode_text = self.tokenizer.encode(piece['text'], add_special_tokens=False, return_special_tokens_mask=True )
+#             encoder_inputs['input_ids'].append(encode_text)
+#             encoder_inputs['shortenable_ids'].append([piece['shortenable_ids']] * len(encode_text))
 
 
-    def merge_wrapped_example(self, wrapped_example, ):
-        ''' # TODO doens't consider the situation that input has two parts
-        '''
+#         encoder_inputs = self.truncate(encoder_inputs=encoder_inputs)
+#         encoder_inputs.pop("shortenable_ids")
+#         encoder_inputs = self.concate_parts(input_dict=encoder_inputs)
+#         decoded_inputs = self.tokenizer.decode(encoder_inputs['input_ids'], clean_up_tokenization_spaces=False)
 
-        wrapped_example, others = wrapped_example
-
-        # for some dataset like SuperGLUE.COPA, the answer requires prediction an span of
-        # the input. Or in generation tasks, we need to generate a piece of target_text.
-        # In these case, it tokenized to the encoded_tgt_text for furture use.
+#         return decoded_inputs
 
 
+#     @staticmethod
+#     def balanced_truncate(input_dict: Dict,
+#                  num_tokens_to_truncate: int=0) -> Dict:
+#         '''truncate the inputs with balance, number of cut tokens is proportional to the part's length.
+#         '''
+#         shortenable_lens = [len(parts) if parts[0]==1 else 0
+#                                   for parts in input_dict['shortenable_ids']]
+#         total_shortenable_len = sum(shortenable_lens)
+#         num_tokens_to_truncate_each_part = [part_len/total_shortenable_len*num_tokens_to_truncate
+#                                                 for part_len in shortenable_lens]
+#         round_list(num_tokens_to_truncate_each_part, num_tokens_to_truncate)
 
-        encoder_inputs = defaultdict(list)
-        for piece in wrapped_example:
-            encode_text = self.tokenizer.encode(piece['text'], add_special_tokens=False, return_special_tokens_mask=True )
-            encoder_inputs['input_ids'].append(encode_text)
-            encoder_inputs['shortenable_ids'].append([piece['shortenable_ids']] * len(encode_text))
+#         truncated_example = defaultdict(list)
+#         for key in input_dict:
+#             parts = input_dict[key]
+#             for num_tokens_to_truncate_part, part in zip(num_tokens_to_truncate_each_part, parts):
+#                 truncated_example[key].append(part[:len(part)-num_tokens_to_truncate_part])
+#         return truncated_example
 
+#     @staticmethod
+#     def truncate_from_tail(input_dict: Dict,
+#                  num_tokens_to_truncate: int=0) -> Dict:
+#         r"""truncate the inputs from the rear
+#         """
+#         truncated_example = defaultdict(list)
+#         shortenable_ids = input_dict['shortenable_ids']
 
-        encoder_inputs = self.truncate(encoder_inputs=encoder_inputs)
-        encoder_inputs.pop("shortenable_ids")
-        encoder_inputs = self.concate_parts(input_dict=encoder_inputs)
-        decoded_inputs = self.tokenizer.decode(encoder_inputs['input_ids'], clean_up_tokenization_spaces=False)
+#         for key in input_dict:
+#             parts = input_dict[key]
+#             to_trunc = num_tokens_to_truncate
+#             for i, part in enumerate(parts[::-1]):
+#                 if len(part) == 0: # to prevent some part are empty after tokenization
+#                     continue
+#                 if shortenable_ids[-1-i][0]==0: # ==0 means the part is not shortenable
+#                     continue
+#                 parts[-1-i] = part[:-to_trunc] if to_trunc<len(part) else []
+#                 to_trunc -= len(part)
+#                 if to_trunc <= 0:
+#                     break
+#             truncated_example[key] = parts
+#         return truncated_example
 
-        # again_encode = self.tokenizer.encode(decoded_inputs, add_special_tokens=False, return_special_tokens_mask=True)
-        # if len(again_encode)> self.max_seq_length - 2:
-        #     print("length exceed!")
-        #     print(wrapped_example)
-        #     print(encoder_inputs['input_ids'])
-        #     print(again_encode)
-        #     print(decoded_inputs)
-        #     exit()
+#     @staticmethod
+#     def truncate_from_head(input_dict: Dict,
+#                  num_tokens_to_truncate: int=0) -> Dict:
+#         r"""truncate the inputs from the head
+#         """
+#         truncated_example = defaultdict(list)
+#         shortenable_ids = input_dict['shortenable_ids']
+#         for key in input_dict:
+#             parts = input_dict[key]
+#             to_trunc = num_tokens_to_truncate
+#             for i, part in enumerate(parts):
+#                 if shortenable_ids[i][0]==0: # ==0 means the part is not shortenable
+#                     continue
+#                 parts[i] = part[:-to_trunc] if to_trunc<len(part) else []
+#                 to_trunc -= len(part)
+#                 if to_trunc <= 0:
+#                     break
+#             truncated_example[key] = parts
+#         return truncated_example
 
-
-
-
-
-
-        # delete shortenable ids
-
-        # encoder_inputs = self.concate_parts(input_dict=encoder_inputs)
-        # encoder_inputs = self.add_special_tokens(encoder_inputs=encoder_inputs)
-        # # create special input ids
-        # encoder_inputs['attention_mask'] = [1] *len(encoder_inputs['input_ids'])
-        # # padding
-        # encoder_inputs = self.padding(input_dict=encoder_inputs, max_len=self.max_seq_length, pad_id_for_inputs=self.tokenizer.pad_token_id)
-
-        return decoded_inputs
-
-    @staticmethod
-    def balanced_truncate(input_dict: Dict,
-                 num_tokens_to_truncate: int=0) -> Dict:
-        '''truncate the inputs with balance, number of cut tokens is proportional to the part's length.
-        '''
-        shortenable_lens = [len(parts) if parts[0]==1 else 0
-                                  for parts in input_dict['shortenable_ids']]
-        total_shortenable_len = sum(shortenable_lens)
-        num_tokens_to_truncate_each_part = [part_len/total_shortenable_len*num_tokens_to_truncate
-                                                for part_len in shortenable_lens]
-        round_list(num_tokens_to_truncate_each_part, num_tokens_to_truncate)
-
-        truncated_example = defaultdict(list)
-        for key in input_dict:
-            parts = input_dict[key]
-            for num_tokens_to_truncate_part, part in zip(num_tokens_to_truncate_each_part, parts):
-                truncated_example[key].append(part[:len(part)-num_tokens_to_truncate_part])
-        return truncated_example
-
-    @staticmethod
-    def truncate_from_tail(input_dict: Dict,
-                 num_tokens_to_truncate: int=0) -> Dict:
-        r"""truncate the inputs from the rear
-        """
-        truncated_example = defaultdict(list)
-        shortenable_ids = input_dict['shortenable_ids']
-
-        for key in input_dict:
-            parts = input_dict[key]
-            to_trunc = num_tokens_to_truncate
-            for i, part in enumerate(parts[::-1]):
-                if len(part) == 0: # to prevent some part are empty after tokenization
-                    continue
-                if shortenable_ids[-1-i][0]==0: # ==0 means the part is not shortenable
-                    continue
-                parts[-1-i] = part[:-to_trunc] if to_trunc<len(part) else []
-                to_trunc -= len(part)
-                if to_trunc <= 0:
-                    break
-            truncated_example[key] = parts
-        return truncated_example
-
-    @staticmethod
-    def truncate_from_head(input_dict: Dict,
-                 num_tokens_to_truncate: int=0) -> Dict:
-        r"""truncate the inputs from the head
-        """
-        truncated_example = defaultdict(list)
-        shortenable_ids = input_dict['shortenable_ids']
-        for key in input_dict:
-            parts = input_dict[key]
-            to_trunc = num_tokens_to_truncate
-            for i, part in enumerate(parts):
-                if shortenable_ids[i][0]==0: # ==0 means the part is not shortenable
-                    continue
-                parts[i] = part[:-to_trunc] if to_trunc<len(part) else []
-                to_trunc -= len(part)
-                if to_trunc <= 0:
-                    break
-            truncated_example[key] = parts
-        return truncated_example
-
-    @staticmethod
-    def concate_parts(input_dict: Dict) -> Dict:
-        for key in input_dict:
-            input_dict[key] = list(itertools.chain(*input_dict[key]))
-        return input_dict
-
-    # @staticmethod
-    # def padding(input_dict: Dict,
-    #             max_len: int, pad_id_for_inputs: int=0, pad_id_for_others: int=0) -> None:
-    #     for key, value in input_dict.items():
-    #         if (len(input_dict[key]) > max_len):
-    #             raise ValueError(f'''
-    #                 Truncated seq length of '{key}' still greater than max length '{max_len}.'
-    #                 One possible reason is that no enough shortenable parts in template. Try add {{"shortenable": "True"}} property.
-    #             ''')
-    #         if 'input' in key:
-    #             input_dict[key].extend([pad_id_for_inputs]*(max_len-len(value)))
-    #         else:
-    #             input_dict[key].extend([pad_id_for_others]*(max_len-len(value)))
-    #     return input_dict
+#     @staticmethod
+#     def concate_parts(input_dict: Dict) -> Dict:
+#         for key in input_dict:
+#             input_dict[key] = list(itertools.chain(*input_dict[key]))
+#         return input_dict
 
 
-    # def add_special_tokens(self, encoder_inputs):
-    #         # add special tokens
-    #     for key in encoder_inputs:
-    #         if key == "input_ids":
-    #             with warnings.catch_warnings():
-    #                 warnings.simplefilter("ignore")
-    #                 encoder_inputs[key] = self.tokenizer.build_inputs_with_special_tokens(
-    #                                                     encoder_inputs[key])
-    #     return encoder_inputs
+#     def truncate(self, encoder_inputs):
+#         total_tokens = sum([len(part) for part in encoder_inputs['input_ids']])
+#         num_specials = self.num_special_tokens_to_add
+#         # print("num_specials", num_specials)
+#         num_tokens_to_truncate = total_tokens - self.max_seq_length + num_specials
+#         self.total_passed_sentences+=1
+#         if num_tokens_to_truncate>0:
+#             self.num_truncated_sentences += 1
+#             if num_tokens_to_truncate > sum([len(x) for x in encoder_inputs['shortenable_ids']]):
+#                 raise RuntimeError("num_tokens_to_truncate larger than number of shortenable tokens.")
+#             encoder_inputs = self.truncate_fct(input_dict=encoder_inputs,
+#                           num_tokens_to_truncate=num_tokens_to_truncate)
+#         return encoder_inputs
 
-    def truncate(self, encoder_inputs):
-        total_tokens = sum([len(part) for part in encoder_inputs['input_ids']])
-        num_specials = self.num_special_tokens_to_add
-        # print("num_specials", num_specials)
-        num_tokens_to_truncate = total_tokens - self.max_seq_length + num_specials
-        self.total_passed_sentences+=1
-        if num_tokens_to_truncate>0:
-            self.num_truncated_sentences += 1
-            if num_tokens_to_truncate > sum([len(x) for x in encoder_inputs['shortenable_ids']]):
-                raise RuntimeError("num_tokens_to_truncate larger than number of shortenable tokens.")
-            encoder_inputs = self.truncate_fct(input_dict=encoder_inputs,
-                          num_tokens_to_truncate=num_tokens_to_truncate)
-        return encoder_inputs
+#     def tokenizer_preprocessor(self, example):
+#         # source, target = example
+#         # from IPython import embed; embed(header="Trehre2")
+#         label = example['label']
+#         guid = example['idx']
+#         meta = dict(example)
+#         meta.pop("label")
+#         meta.pop("idx")
+
+
+
+#         # from IPython import embed; embed(header="Trehre2")
+
+#         e = InputExample(**{"meta": meta, 'label': label, 'guid': guid})
+
+#         if self.predict_with_generate:
+#             e = self.verbalizer.wrap_one_example(e)
+#         example_wrapped = self.template.wrap_one_example(e)
+#         encoded_sentence = self.tokenizer_wrapper.merge_wrapped_example(example_wrapped)
+#         print(encoded_sentence)
+#         if self.predict_with_generate:
+#             # return {"source": encoded_sentence, 'target': ', 'extra_fields':[]}
+#             return {"source": encoded_sentence, "label": label, 'target': '', 'extra_fields':{'dataset_name':self.name}}
+#         else:
+#             return {"source": encoded_sentence, "label": label, 'target': e.target_text, 'extra_fields':{'dataset_name':self.name}}
 
 
 
@@ -234,46 +221,23 @@ class AbstractTask(abc.ABC):
                                          "superglue-boolq", "qqp", "qnli", "superglue-record", "sst2"]
     large_data_without_all_splits = [] #["qqp", "qnli", "superglue-record", "sst2"]
 
-    def __init__(self, config, data_args, tokenizer, predict_with_generate, seed=42, default_max_length=1):
+    def __init__(self, config, data_args, seed=42, default_max_length=1):
         self.config = config
         self.seed = seed
         self.data_args = data_args
-        self.tokenizer = tokenizer
-        self.predict_with_generate = predict_with_generate
+        # self.tokenizer = tokenizer
+        # self.predict_with_generate = predict_with_generate
         self.default_max_length = default_max_length
-        self.truncate_method = getattr(data_args, "truncate_method", "balanced")
 
-        tid = getattr(config, "template_id", 0)
-        vid = getattr(config, "verbalizer_id", 0)
-
-        self.template = ManualTemplate(tokenizer=self.tokenizer, text = self.templates_text[tid])
-        self.verbalizer = ManualVerbalizer(tokenizer=self.tokenizer, classes = self.labels_list, label_words=self.verbalizers[vid])
-
-        # if self.predict_with_generate:
-        #     self.reverse_verbalizer = {(int(x) for x in self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(self.verbalizer[label]))): label for label in self.labels_list}
-        # else:
-        #     self.reverse_verbalizer = {int(self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(self.verbalizer[label]))[0]): label for label in self.labels_list}
-
-        self.tokenizer_wrapper = MLMTokenizerWrapper(max_seq_length=self.data_args.max_source_length, tokenizer=self.tokenizer, truncate_method=self.truncate_method)
-
-        generation_paradigm = getattr(config, "generation_paradigm", True)
+        # generation_paradigm = getattr(config, "generation_paradigm", True)
         # self.prompt = PromptCollections[self.name](tid, vid, generation_paradigm)
-        self.max_target_length = self.get_max_target_length(self.default_max_length)
 
-    def get_max_target_length(self, default_max_length):
-        if self.predict_with_generate:
-            return max([len(label) for key, label in self.verbalizer.label_words_ids.items()])
-        else:
-            return default_max_length
 
-    def seq2seq_format(self, source, target, extra_fields={}
-                       ):
-
-        return {'source': ' '.join(source),
-                'target': ' '.join(target),
-                'task': self.name,
-                'extra_fields': extra_fields
-                }
+    # def get_max_target_length(self, default_max_length):
+    #     if self.predict_with_generate:
+    #         return -1
+    #     else:
+    #         return default_max_length
 
     def check_n_obs(self, n_obs, total_size):
         if n_obs is not None and n_obs > total_size:
@@ -312,36 +276,8 @@ class AbstractTask(abc.ABC):
         else:
             return indices[validation_size:]
 
-
-    def map_dataset(self, dataset):
-        # from IPython import embed; embed(header="in get target length")
-        return dataset.map(self.preprocessor).map(self.tokenizer_preprocessor)
-
     def preprocessor(self, example):
         return example
-
-    def tokenizer_preprocessor(self, example):
-        # source, target = example
-        # from IPython import embed; embed(header="Trehre2")
-        label = example['label']
-        guid = example['idx']
-        meta = dict(example)
-        meta.pop("label")
-        meta.pop("idx")
-
-
-
-        # from IPython import embed; embed(header="Trehre2")
-
-        e = InputExample(**{"meta": meta, 'label': label, 'guid': guid})
-        template_e = self.template.wrap_one_example(e)
-        encoded_sentence = self.tokenizer_wrapper.merge_wrapped_example(template_e)
-        if self.predict_with_generate:
-            # return {"source": encoded_sentence, 'target': ', 'extra_fields':[]}
-            raise NotImplementedError
-        else:
-            return {"source": encoded_sentence, "label": label, 'target': '', 'extra_fields':{'dataset_name':self.name}}
-
 
     def get(self, split, n_obs=None, split_validation_test=False):
         # For small datasets (n_samples < 10K) without test set, we divide validation set to
@@ -368,7 +304,7 @@ class AbstractTask(abc.ABC):
             # shuffles the data and samples it.
             if n_obs is not None:
                 dataset = self.subsample(dataset, n_obs)
-        return self.map_dataset(dataset)
+        return dataset.map(self.preprocessor)
 
 class Squad(AbstractTask):
     name = "squad"
@@ -387,25 +323,7 @@ class Squad(AbstractTask):
         return self.seq2seq_format(source, target, add_prefix)
 
 
-class MRPC(AbstractTask):
-    name = "mrpc"
-    labels_list = ["0", "1"]
-    metric = [metrics.f1_score, metrics.accuracy]
-    metric_names = ["f1", "accuracy"]
-    split_to_data_split = {"train": "train",
-                           "validation": "validation",
-                           "test": "validation"}
-
-    def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'mrpc', split=split, script_version="master")
-
-    # def preprocessor(self, example, add_prefix=True):
-    #     src_texts = ["sentence1:", example['sentence1'],
-    #                  "sentence2:", example["sentence2"]]
-    #     tgt_texts = [str(example['label'])]
-    #     return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
-
-
+##GLUE
 class COLA(AbstractTask):
     name = "cola"
     labels_list = ["0", "1"]
@@ -415,14 +333,19 @@ class COLA(AbstractTask):
                            "validation": "validation",
                            "test": "validation"}
 
-    def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'cola',
-                                     split=split, script_version="master")
+    templates_text = {"0": """sentence: {"meta": 'sentence', "shortenable":True} Are there any error in the sentence? {"mask"}""",
+    }
 
-    # def preprocessor(self, example, add_prefix=True):
-    #     src_texts = ["sentence:", example['sentence']]
-    #     tgt_texts = [str(example['label'])]
-    #     return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
+    verbalizers = {
+        "0":{ "0": "yes", "1": "no"}
+    }
+
+    def load_dataset(self, split):
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.cola")[split]
+        else:
+            return datasets.load_dataset('glue', 'cola',
+                                     split=split, script_version="master")
 
 
 class SST2(AbstractTask):
@@ -434,38 +357,50 @@ class SST2(AbstractTask):
                            "validation": "validation",
                            "test": "validation"}
 
-    verbalizers = [
-        
-    ]
+    verbalizers = {
+        "0":{"0":"negative","1":"positive"}
+    }
+
+    templates_text = {
+        "0":"""The sentiment of sentence: "{"meta":"sentence", "shortenable":True} is {"mask"}."""
+    }
 
     def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'sst2',
-                                     split=split, script_version="master")
-
-    def preprocessor(self, example, add_prefix=True):
-        src_texts = ["sentence:", example['sentence']]
-        tgt_texts = [str(example['label'])]
-        return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.sst2")[split]
+        else:
+            return datasets.load_dataset('glue', 'sst2',
+                                        split=split, script_version="master")
 
 
-class STSB(AbstractTask):
-    name = "stsb"
-    labels_list = [str(np.round(label, decimals=1)) for label in np.arange(0, 5.2, 0.2)]
-    metric = [metrics.pearson_corrcoef, metrics.spearman_corrcoef]
-    metric_names = ["pearson", "spearmanr"]
+
+class MRPC(AbstractTask):
+    name = "mrpc"
+    labels_list = ["0", "1"]
+    metric = [metrics.f1_score, metrics.accuracy]
+    metric_names = ["f1", "accuracy"]
     split_to_data_split = {"train": "train",
                            "validation": "validation",
                            "test": "validation"}
 
-    def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'stsb',
-                                     split=split, script_version="master")
 
-    def preprocessor(self, example, add_prefix=True):
-        src_texts = ["sentence1:", example['sentence1'],
-                     "sentence2:", example["sentence2"]]
-        tgt_texts = [str(round_stsb_target(example['label']))]
-        return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
+    templates_text = {
+        "0": """sentence1: {"meta": 'sentence1', "shortenable":True}. sentence2: {"meta":"sentence2", "shortenable":True}. Are sentence1 and sentence2 equivalent? {"mask"}.""",
+    }
+
+    verbalizers = {
+        "0":{"0": "no","1": "yes"}
+    }
+
+
+
+
+    def load_dataset(self, split):
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.mrpc")[split]
+        else:
+            return datasets.load_dataset('glue', 'mrpc', split=split, script_version="master")
+
 
 
 class QQP(AbstractTask):
@@ -477,14 +412,46 @@ class QQP(AbstractTask):
                            "validation": "validation",
                            "test": "validation"}
 
+    templates_text = {"0":
+        """question1: {"meta": 'question1', "shortenable":True}. question2: {"meta": 'question2', "shortenable":True} Are question1 and question2 equivalent? {"mask"}."""
+    }
+
+    verbalizers = {
+        "0":{"0": "no","1": "yes"}
+    }
+
+
     def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'qqp',
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.qqp")[split]
+        else:
+            return datasets.load_dataset('glue', 'qqp',
+                                     split=split, script_version="master")
+
+
+
+class STSB(AbstractTask):
+    name = "stsb"
+    labels_list = [str(np.round(label, decimals=1)) for label in np.arange(0, 5.2, 0.2)]
+    metric = [metrics.pearson_corrcoef, metrics.spearman_corrcoef]
+    metric_names = ["pearson", "spearmanr"]
+    split_to_data_split = {"train": "train",
+                           "validation": "validation",
+                           "test": "validation"}
+
+
+    verbalizers = {
+        ""
+    }
+
+    def load_dataset(self, split):
+        return datasets.load_dataset('glue', 'stsb',
                                      split=split, script_version="master")
 
     def preprocessor(self, example, add_prefix=True):
-        src_texts = ["question1:", example['question1'],
-                     "question2:", example["question2"]]
-        tgt_texts = [str(example['label'])]
+        src_texts = ["sentence1:", example['sentence1'],
+                     "sentence2:", example["sentence2"]]
+        tgt_texts = [str(round_stsb_target(example['label']))]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
@@ -498,14 +465,29 @@ class MNLI(AbstractTask):
     metric_names = ["accuracy"]
 
 
-    def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'mnli', split=split, script_version="master")
+    templates_text = {
+        "0":"""premise: {"meta": 'premise', "shortenable":True}. hypothesis: {"meta": 'hypothesis', "shortenable":True} Does the premise entails the hypothesis? {"mask"}.""",
+    }
 
-    def preprocessor(self, example, add_prefix=True):
-        src_texts = ["premise:", example['premise'],
-                     "hypothesis", example["hypothesis"]]
-        tgt_texts = [str(example['label'])]
-        return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
+    verbalizers = {
+        "0":{
+            "0": "yes",
+            "1": "neutral",
+            "2": "no",
+        }
+    }
+
+    def load_dataset(self, split):
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.mnli")[split]
+        else:
+            return datasets.load_dataset('glue', 'mnli', split=split, script_version="master")
+
+    # def preprocessor(self, example, add_prefix=True):
+    #     src_texts = ["premise:", example['premise'],
+    #                  "hypothesis", example["hypothesis"]]
+    #     tgt_texts = [str(example['label'])]
+    #     return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
 class QNLI(AbstractTask):
@@ -517,14 +499,33 @@ class QNLI(AbstractTask):
                            "validation": "validation",
                            "test": "validation"}
 
-    def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'qnli', split=split, script_version="master")
+    templates_text = {
+        "0": """premise: {"meta": 'sentence', "shortenable":True}. hypothesis: {"meta": 'question', "shortenable":True}"""+
+        """Does the premise entails the hypothesis? {"mask"}.""",
+    }
 
-    def preprocessor(self, example, add_prefix=True):
-        src_texts = ["question:", example['question'],
-                     "sentence:", example["sentence"]]
-        tgt_texts = [str(example['label'])]
-        return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
+    verbalizers = {
+        "0":{
+            "0": "yes",
+            "1": "no",
+        }
+    }
+
+
+    def load_dataset(self, split):
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.qnli")[split]
+        else:
+            return datasets.load_dataset('glue', 'qnli', split=split, script_version="master")
+
+    # def load_dataset(self, split):
+    #     return datasets.load_dataset('glue', 'qnli', split=split, script_version="master")
+
+    # def preprocessor(self, example, add_prefix=True):
+    #     src_texts = ["question:", example['question'],
+    #                  "sentence:", example["sentence"]]
+    #     tgt_texts = [str(example['label'])]
+    #     return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 #Tested
 class RTE(AbstractTask):
@@ -537,15 +538,15 @@ class RTE(AbstractTask):
                            "test": "validation"}
 
 
-    templates_text = [
-        """sentence1: {"meta": 'sentence1', "shortenable":True}. sentence2:,"""+
-        """{"meta":"sentence2", "shortenable":True}. The answer was {"mask"}.""",
-        ]
+    templates_text = {
+        "0": """sentence1: {"meta": 'sentence1', "shortenable":True} sentence2: {"meta":"sentence2", "shortenable":True} The answer was {"mask"}.""",
+    }
 
-    verbalizers = [{
-            "0": "yes",
+    verbalizers = {
+        "0":{"0": "yes",
             "1": "no"
-        }]
+        }
+    }
 
     def load_dataset(self, split):
         if self.data_args.datasets_load_from_disk:
@@ -553,38 +554,6 @@ class RTE(AbstractTask):
         else:
             return datasets.load_dataset('glue', 'rte',
                                      split=split, script_version="master")
-
-
-#Tested
-class SuperGLUEBoolQ(AbstractTask):
-    name="superglue-boolq"
-    labels_list = ['0', '1']
-    metric = [metrics.accuracy]
-    metric_names = ["accuracy"]
-    split_to_data_split = {"train": "train",
-                           "validation": "validation",
-                           "test": "validation"}
-
-    verbalizers = [
-        {
-            "0": "no",
-            "1": "yes"
-        },
-    ]
-    mlmhead_verbalizers = {
-        "0": "no",
-        "1": "yes"
-    }
-    templates_text = [
-        """hypothesis: {"meta": "question", "shortenable":True} premise: {"meta":"passage", "shortenable":True} The answer was {"mask"}."""
-    ]
-
-    def load_dataset(self, split):
-        if self.data_args.datasets_load_from_disk:
-            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/super_glue.boolq")[split]
-        else:
-            return datasets.load_dataset('super_glue', 'boolq', split=split, script_version="master")
-
 
 
 
@@ -597,13 +566,13 @@ class WNLI(AbstractTask):
                            "validation": "validation",
                            "test": "validation"}
 
-    verbalizers = [{
-        "0": "True",
-        "1": "False",
-    }]
-    templates_text = [
-        """{"meta": 'sentence1',"shortenable":True} Does it mean the following: "{"meta":'sentence2'}"? {"mask"}."""
-    ]
+    verbalizers = {
+        "0":{"0": "True",
+            "1": "False",
+            }
+    }
+    templates_text = {"0": """{"meta": 'sentence1',"shortenable":True} Does it mean the following: "{"meta":'sentence2'}"? {"mask"}."""
+    }
 
 
     def load_dataset(self, split):
@@ -611,6 +580,34 @@ class WNLI(AbstractTask):
             return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.wnli")[split]
         else:
             return datasets.load_dataset('glue', 'wnli', split=split, script_version="master")
+
+
+#SuperGLUE
+class SuperGLUEBoolQ(AbstractTask):
+    name="superglue-boolq"
+    labels_list = ['0', '1']
+    metric = [metrics.accuracy]
+    metric_names = ["accuracy"]
+    split_to_data_split = {"train": "train",
+                           "validation": "validation",
+                           "test": "validation"}
+
+    verbalizers = {
+        "0": {
+            "0": "no",
+            "1": "yes"
+        },
+    }
+
+    templates_text = {
+        "0": """hypothesis: {"meta": "question", "shortenable":True} premise: {"meta":"passage", "shortenable":True} The answer was {"mask"}."""
+    }
+
+    def load_dataset(self, split):
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/super_glue.boolq")[split]
+        else:
+            return datasets.load_dataset('super_glue', 'boolq', split=split, script_version="master")
 
 
 #
@@ -623,14 +620,15 @@ class SuperGLUECB(AbstractTask):
     metric = [metrics.mean_multiclass_f1(num_classes=3), metrics.accuracy]
     metric_names = ["f1_multiclass", "accuracy"]
 
-    verbalizers = [{
-        "0": "yes",
-        "1": "no",
-        "2": "maybe"
-    }]
-    templates_text = [
-        """hypothesis: {"meta": 'hypothesis',"shortenable":True} premise: {"meta":'premise', "shortenable":True} The answer was {"mask"}."""
-    ]
+    verbalizers = {
+        "0":{"0": "yes",
+            "1": "no",
+            "2": "maybe"
+        }
+    }
+    templates_text = {
+        "0": """hypothesis: {"meta": 'hypothesis',"shortenable":True} premise: {"meta":'premise', "shortenable":True} The answer was {"mask"}."""
+    }
 
     def load_dataset(self, split):
         if self.data_args.datasets_load_from_disk:
@@ -648,13 +646,15 @@ class SuperGLUECOPA(AbstractTask):
     metric = [metrics.accuracy]
     metric_names = ["accuracy"]
 
-    verbalizers = [{
-        "0": "1",
-        "1": "2",
-    }]
-    templates_text = [
-        """choice1: {"meta":"choice1"} choice2: {"meta":"choice2"} premise: {"meta":"premise", "shortenable":True} The {"meta":"question"} answer was choice{"mask"}."""
-    ]
+    verbalizers = {
+        "0":{
+            "0": "1",
+            "1": "2",
+        }
+    }
+    templates_text = {
+       "0": """choice1: {"meta":"choice1"} choice2: {"meta":"choice2"} premise: {"meta":"premise", "shortenable":True} The {"meta":"question"} answer was choice{"mask"}."""
+    }
 
     def load_dataset(self, split):
         if self.data_args.datasets_load_from_disk:
@@ -673,19 +673,16 @@ class SuperGLUEMultiRC(AbstractTask):
               metrics.accuracy]
     metric_names = ["f1", "em"]
 
-    # generation_verbalizers = [{
-    #     "0": "no",
-    #     "1": "yes",
-    # },
-    # ]
 
-    verbalizers = [{
+    verbalizers = {
+        "0": {
         "0": "no",
         "1": "yes",
-    }]
-    templates_text = [
-        """question: {"meta":"question", "shortenable":False} answer: {"meta":"answer", "shortenable":False, "post_processing": lambda x:x+"."} paragraph: {"meta":"paragraph", "shortenable":True} The answer was {"mask"}."""
-    ]
+        }
+    }
+    templates_text = {
+        "0": """question: {"meta":"question", "shortenable":False} answer: {"meta":"answer", "shortenable":False, "post_processing": lambda x:x+"."} paragraph: {"meta":"paragraph", "shortenable":True} The answer was {"mask"}."""
+    }
 
 
     def load_dataset(self, split):
@@ -720,15 +717,16 @@ class SuperGLUEWIC(AbstractTask):
     metric = [metrics.accuracy]
     metric_names = ["accuracy"]
 
-    verbalizers = [{
+    verbalizers = {
+        "0": {
         "0": "No",
         "1": "Yes",
-    }]
+        }
+    }
 
-    templates_text = [
-        """sentence1: {"meta":"sentence1"} sentence2: {"meta":"sentence2", "shortenable": True} word: {"meta":"word"} {"mask"}.
-        """
-    ]
+    templates_text = {
+        "0": """sentence1: {"meta":"sentence1"} sentence2: {"meta":"sentence2", "shortenable": True} word: {"meta":"word"} {"mask"}."""
+    }
 
     def load_dataset(self, split):
         if self.data_args.datasets_load_from_disk:
@@ -786,7 +784,7 @@ class SuperGLUEWIC(AbstractTask):
 #         text = self._mark_span(text, example['span2_text'], span2_index, '#')
 #         src_texts = ["text:", text]
 #         tgt_texts = [str(example["label"])]
-#         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
+#         return self.fseq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
 class SuperGLUERecord(AbstractTask):
@@ -875,9 +873,9 @@ TASK_MAPPING = OrderedDict(
 
 class AutoTask:
     @classmethod
-    def get(self, task, config, data_args, tokenizer,predict_with_generate, seed=42):
+    def get(self, task, config, data_args, seed=42):
         if task in TASK_MAPPING:
-            return TASK_MAPPING[task](config, data_args, tokenizer,predict_with_generate, seed)
+            return TASK_MAPPING[task](config, data_args, seed)
         raise ValueError(
             "Unrecognized task {} for AutoTask Model: {}.\n"
             "Task name should be one of {}.".format(

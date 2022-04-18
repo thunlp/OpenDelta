@@ -728,6 +728,9 @@ class DeltaBase(nn.Module, SaveLoadMixin):
                     elif _delta_info['method'] == "insert_sequential":
                         self.insert_sequential_module(module=submodule,
                                     _delta_info=_delta_info)
+                    elif _delta_info['method'] == "insert_parallel":
+                        self.insert_parallel_module(module=submodule,
+                                    _delta_info=_delta_info)
                     else:
                         raise NotImplementedError
 
@@ -765,7 +768,13 @@ class DeltaBase(nn.Module, SaveLoadMixin):
                             submodule.forward = submodule.forward.__wrapped__
                             delattr(submodule, _delta_info["delta_name"])
                         else:
-                            raise AttributeError("submodule {}'s forward has no attribute __wrapped__. It'ss not a wrapped function.".format(name))
+                            raise AttributeError("submodule {}'s forward has no attribute __wrapped__. It's not a wrapped function.".format(name))
+                    elif _delta_info['method'] == "insert_parallel":
+                        if hasattr(submodule.forward, "__wrapped__"):
+                            submodule.forward = submodule.forward.__wrapped__
+                            delattr(submodule, _delta_info["delta_name"])
+                        else:
+                            raise AttributeError("submodule {}'s forward has no attribute __wrapped__. It's not a wrapped function.".format(name))
                     else:
                         raise NotImplementedError
 
@@ -775,5 +784,4 @@ class DeltaBase(nn.Module, SaveLoadMixin):
                 module.state_dict = module.state_dict.__wrapped__
             except AttributeError:
                 pass
-
 
