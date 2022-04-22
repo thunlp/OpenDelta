@@ -21,10 +21,10 @@ class HyperComplexAdapterLayer(nn.Module):
     are parameters are 1/n times of the conventional adapter layers, where n is
     hypercomplex division number."""
 
-    def __init__(self, 
-                 reduction_factor=16, 
-                 non_linearity="relu", 
-                 phm_c_init="normal", 
+    def __init__(self,
+                 reduction_factor=16,
+                 non_linearity="relu",
+                 phm_c_init="normal",
                  hypercomplex_division=4,
                  learn_phm=True,
                  hypercomplex_nonlinearity="glorot-uniform",
@@ -60,7 +60,7 @@ class HyperComplexAdapterLayer(nn.Module):
         self.device = device
 
         self.instantiated = False
-        
+
 
     def instantiate(self, hidden_dim):
         self.down_sample_size = hidden_dim // self.reduction_factor
@@ -81,7 +81,7 @@ class HyperComplexAdapterLayer(nn.Module):
                                       phm_init_range=self.phm_init_range,
                                       kronecker_prod=self.kronecker_prod).to(self.device)
         self.up_sampler = PHMLinear(in_features=self.down_sample_size,
-                                    out_features=hidden_dim, 
+                                    out_features=hidden_dim,
                                     bias=self.use_bias_up_sampler,
                                     c_init=self.phm_c_init,
                                     phm_dim=self.hypercomplex_division,
@@ -97,9 +97,9 @@ class HyperComplexAdapterLayer(nn.Module):
                                     kronecker_prod=self.kronecker_prod).to(self.device)
         self.instantiated = True
 
-    
+
     def post_forward(self, output):
-        r""" Get the hidden_states from the PLM's layer output, pass it into the hypercomplex adapter, 
+        r""" Get the hidden_states from the PLM's layer output, pass it into the hypercomplex adapter,
         then combined with the main hidden_states. Finally pass it into the subsequent layer.
 
         """
@@ -110,12 +110,12 @@ class HyperComplexAdapterLayer(nn.Module):
             hiddens = output
         else:
             raise TypeError
-        
+
         if not self.instantiated:
             self.hidden_dim = hiddens.shape[-1]
             logger.debug(f"Got hidden dim hidden_dim {self.hidden_dim}")
             self.instantiate(hidden_dim=self.hidden_dim)
-            
+
 
         z = self.down_sampler(hiddens)
         z = self.activation(z)
@@ -136,12 +136,12 @@ class CompacterConfig(BaseDeltaConfig):
 
     """
     def __init__(
-        self, 
-        bottleneck_dim: Optional[int]=32, 
+        self,
+        bottleneck_dim: Optional[int]=32,
         non_linearity: Optional[str]='relu',
         sequential: Optional[str] = True,
-        reduction_factor=16, 
-        phm_c_init="normal", 
+        reduction_factor=16,
+        phm_c_init="normal",
         hypercomplex_division=4,
         learn_phm=True,
         hypercomplex_nonlinearity="glorot-uniform",
@@ -155,7 +155,7 @@ class CompacterConfig(BaseDeltaConfig):
         use_bias_up_sampler=True,
         use_bias_down_sampler=True,
         **kwargs
-    ): 
+    ):
         super().__init__(**kwargs)
         arg_names = get_arg_names_inside_func(self.__init__)
         for arg_name in arg_names:
@@ -166,63 +166,64 @@ class CompacterConfig(BaseDeltaConfig):
 
 class CompacterModel(DeltaBase):
     r""" The implementation of `Compacter: Efficient Low-Rank Hypercomplex Adapter Layers <https://arxiv.org/abs/2106.04647>`_ .
-    Add compacter layer to the designated ``modified_modules``. In sequential paradigm,  The modules' output is then 
-    passed into the compacter's post_forward. 
-    
+    Add compacter layer to the designated ``modified_modules``. In sequential paradigm,  The modules' output is then
+    passed into the compacter's post_forward.
+
     .. note::
-        We **assume** the output of the modified module is the hidden state or a tuple where hidden state is the 
-        first element. This is true for most PLMs. However, we admit that currently it's not rigorous, We will improve 
-        it in the next version. Currently, if you encount an error here for you backbone, you can modify the code to 
+        We **assume** the output of the modified module is the hidden state or a tuple where hidden state is the
+        first element. This is true for most PLMs. However, we admit that currently it's not rigorous, We will improve
+        it in the next version. Currently, if you encount an error here for you backbone, you can modify the code to
         get the hidden state.
-    
+
     All the hyperparameter is adopted from the `compacter code base <https://github.com/rabeehk/compacter>`_ .
 
     class attributes:
         - default_modified_modules = ["attn", "ff"] According to the compacter paper, we add compacter to the attention layer
-          and feed forward layer. 
+          and feed forward layer.
         - delta_type = "compacter"
 
     Args:
-        backbone_model (:obj:`transformers.PretrainedModels`): The backbone model to be modified. 
+        backbone_model (:obj:`transformers.PretrainedModels`): The backbone model to be modified.
         modified_modules (:obj:`List[str]`): For prefix tuning, the it must refer to an attention layer (Currently, only
                         the implemented ones)
         unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen
                          together with the prefix parameters.
         common_structure (:obj:`bool`, *optional*, default to :obj:`None`): whether using name-based addressing with a common structure mapping.
-        reduction_factor (:obj:`int`, *optional*, default to ``16``): bottleneck_dim = hidden_dim//reduction_factor 
-        non_linearity (:obj:`str`, *optional*, default to ``"gelu_new"``): The non linearity activation used in between the down 
-                        projecter and the up projecter. 
-        phm_c_init (:obj:`str`, *optional*, default to ``"normal"``): The initialize method of the C in compacter. 
-        hypercomplex_division (:obj:`str`, *optional*, default to 4): The ``n`` in the paper. The number of division along a dimension in compector. 
+        reduction_factor (:obj:`int`, *optional*, default to ``16``): bottleneck_dim = hidden_dim//reduction_factor
+        non_linearity (:obj:`str`, *optional*, default to ``"gelu_new"``): The non linearity activation used in between the down
+                        projecter and the up projecter.
+        phm_c_init (:obj:`str`, *optional*, default to ``"normal"``): The initialize method of the C in compacter.
+        hypercomplex_division (:obj:`str`, *optional*, default to 4): The ``n`` in the paper. The number of division along a dimension in compector.
         learn_phm (:obj:`bool`, *optional*, default to :obj:`True` ): Whether the phm rule requires_grad. Note that we didn't check the performance of learn_phm=False.
-        hypercomplex_nonlinearity (:obj:`str`, *optional*, default to ``"glorot-uniform"``): The initialize method of the W in compacter. 
-        shared_phm_rule (:obj:`str`, *optional* , default to :obj:`False`): Whether the phm rule is shared accross layer. 
+        hypercomplex_nonlinearity (:obj:`str`, *optional*, default to ``"glorot-uniform"``): The initialize method of the W in compacter.
+        shared_phm_rule (:obj:`str`, *optional* , default to :obj:`False`): Whether the phm rule is shared accross layer.
         factorized_phm (:obj:`str`, *optional*, default to :obj:`True`): Whether to factorize the phm into low rank product.
-        shared_W_phm (:obj:`str`, *optional* , default to :obj:`False`): Whether the W_phm is shared accross layer. 
-        factorized_phm_rule (:obj:`str`, *optional* , default to :obj:`False`): Whether to factorize the phm rule into low rank product. 
-        phm_rank=1 (:obj:`int`, *optional*, default to 1): The rank of low rank decomposition of phm. 
+        shared_W_phm (:obj:`str`, *optional* , default to :obj:`False`): Whether the W_phm is shared accross layer.
+        factorized_phm_rule (:obj:`str`, *optional* , default to :obj:`False`): Whether to factorize the phm rule into low rank product.
+        phm_rank=1 (:obj:`int`, *optional*, default to 1): The rank of low rank decomposition of phm.
         phm_init_range (:obj:`float`, *optional*, default to 0.0001): The range of phm initialization.
-        kronecker_prod (:obj:`bool`, *optional*, default to False): Whether to perform kronecker_prod in matvec_product, proposed by 
+        kronecker_prod (:obj:`bool`, *optional*, default to False): Whether to perform kronecker_prod in matvec_product, proposed by
             `Parameterization of Hypercomplex Multiplications <https://openreview.net/forum?id=rcQdycl0zyk>`_
-        use_bias_up_sampler (:obj:`float`, *optional*, default to :obj:`True`): Whether add bias to the up projector. 
-                            Note that the bias for this is a ``hidden_dim`` vector. 
-        use_bias_down_sampler (:obj:`float`, *optional*, default to :obj:`True`): Whether add bias to the down projector. 
-                            Note that the bias for this is a ``bottleneck_dim`` vector. 
+        use_bias_up_sampler (:obj:`float`, *optional*, default to :obj:`True`): Whether add bias to the up projector.
+                            Note that the bias for this is a ``hidden_dim`` vector.
+        use_bias_down_sampler (:obj:`float`, *optional*, default to :obj:`True`): Whether add bias to the down projector.
+                            Note that the bias for this is a ``bottleneck_dim`` vector.
 
 
     """
     config_class = CompacterConfig
     delta_type = "compacter"
     default_modified_modules = ["attn", "ff"]
-    def __init__(self, 
+    def __init__(self,
                  backbone_model,
                  modified_modules: Optional[List[str]] = None,
+                 exclude_modules: Optional[List[str]] = None,
                  unfrozen_modules: Optional[List[str]] = None,
                  common_structure: Optional[bool] = None,
                  interactive_modify: Optional[Union[bool, int]] = False,
-                 reduction_factor=16, 
-                 non_linearity="gelu_new", 
-                 phm_c_init="normal", 
+                 reduction_factor=16,
+                 non_linearity="gelu_new",
+                 phm_c_init="normal",
                  hypercomplex_division=4,
                  learn_phm=True,
                  hypercomplex_nonlinearity="glorot-uniform",
@@ -236,9 +237,10 @@ class CompacterModel(DeltaBase):
                  use_bias_up_sampler=True,
                  use_bias_down_sampler=True,
                 ):
-        DeltaBase.__init__(self, 
-                           backbone_model, 
+        DeltaBase.__init__(self,
+                           backbone_model,
                            modified_modules=modified_modules,
+                           exclude_modules=exclude_modules,
                            unfrozen_modules=unfrozen_modules,
                            common_structure=common_structure,
                            interactive_modify=interactive_modify,
@@ -259,10 +261,10 @@ class CompacterModel(DeltaBase):
         self.add_all_delta_to_backbone(self.backbone_model,
                                    self.modified_modules,
                                    )
-  
 
-    def add_all_delta_to_backbone(self, 
-                 module: nn.Module, 
+
+    def add_all_delta_to_backbone(self,
+                 module: nn.Module,
                  modified_modules: List[str],
                 ) -> nn.Module:
         for key, _ in module.named_modules():
@@ -271,19 +273,19 @@ class CompacterModel(DeltaBase):
         self._pseudo_data_to_instantiate(module)
         self.mark_as_delta()
         return module
-    
+
     def update_module(self, module: nn.Module, key: str):
         _, _, ref = self.find_module(module, key)
         adapterlayer = self.new_module_like(ref)
-        self.insert_sequential_module(ref, 
+        self.insert_sequential_module(ref,
                                       delta_module=adapterlayer,
                                       delta_name="compactor")
-    
+
     def new_module_like(self, module):
         module_device = get_device(module)
-        adapterlayer = HyperComplexAdapterLayer(reduction_factor=self.reduction_factor, 
-                                                non_linearity=self.non_linearity, 
-                                                phm_c_init=self.phm_c_init, 
+        adapterlayer = HyperComplexAdapterLayer(reduction_factor=self.reduction_factor,
+                                                non_linearity=self.non_linearity,
+                                                phm_c_init=self.phm_c_init,
                                                 hypercomplex_division=self.hypercomplex_division,
                                                 learn_phm=self.learn_phm,
                                                 hypercomplex_nonlinearity=self.hypercomplex_nonlinearity,
@@ -298,6 +300,5 @@ class CompacterModel(DeltaBase):
                                                 use_bias_down_sampler=self.use_bias_down_sampler,
                                                 device=module_device
                                                 )
-        self.delta_modules.append(adapterlayer)  
+        self.delta_modules.append(adapterlayer)
         return adapterlayer
-    

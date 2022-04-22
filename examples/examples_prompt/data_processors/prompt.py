@@ -1,4 +1,4 @@
-
+# from openprompt.prompts import ManualTemplate
 
 class BasePrompt(object):
     def __init__(self, template_id=0, verbalizer_id=0, generation=True):
@@ -9,26 +9,28 @@ class BasePrompt(object):
             self.verbalizer = self.mlmhead_verbalizers[verbalizer_id]
 
 
+
     def __call__(self, example):
+
         def eval_syntax(syntaxlist, example):
             composed = []
             for x in syntaxlist:
                 if x.startswith("[_eval_]"):
-                    t = eval(x[len("[_eval_]"):]) 
+                    t = eval(x[len("[_eval_]"):])
                 else:
                     t = x
                 composed.append(t)
             return composed
         src_texts = eval_syntax(self.template,example)
-        
+
         tgt_texts = self.verbalizer[str(example['label'])]
         if isinstance(tgt_texts, list):
             tgt_texts = eval_syntax(tgt_texts, example)
         else:
             tgt_texts = [tgt_texts]
         return src_texts,  tgt_texts
-    
-    
+
+
 
 
 
@@ -48,7 +50,7 @@ class MRPCPrompt(BasePrompt):
         "1": "same"
     }
     textual_templates = [
-        ["sentence1:", """[_eval_]example['sentence1']""", 
+        ["sentence1:", """[_eval_]example['sentence1']""",
         "sentence2:", """[_eval_]example["sentence2"]""", "Meanings different of same? Answer: " ]
     ]
 
@@ -68,7 +70,7 @@ class BoolQPrompt(BasePrompt):
         "1": "same"
     }
     textual_templates = [
-        ["sentence1:", """[_eval_]example['sentence1']""", 
+        ["sentence1:", """[_eval_]example['sentence1']""",
         "sentence2:", """[_eval_]example["sentence2"]""", "Meanings different of same? Answer: " ]
     ]
 
@@ -84,7 +86,7 @@ class BoolQPrompt(BasePrompt):
         "1": "yes"
     }
     textual_templates = [
-        ["hypothesis:", """[_eval_]example['hypothesis']""", 
+        ["hypothesis:", """[_eval_]example['hypothesis']""",
         "premise:", """[_eval_]example["premise"]""", "The answer was " ]
     ]
 
@@ -100,7 +102,7 @@ class COLAPrompt(BasePrompt):
         "1": "Yes"
     }
     textual_templates = [
-        ["sentence:", """[_eval_]example['sentence']""", 
+        ["sentence:", """[_eval_]example['sentence']""",
         "grammar correct? " ]
     ]
 
@@ -119,7 +121,7 @@ class RTEPrompt(BasePrompt):
     textual_templates = [
         ["sentence1:", """[_eval_]example['premise']""", "sentence2:",
         """[_eval_]example['hypothesis']""",
-        "The answer was " ]
+        "The answer was "]
     ]
 
 class CBPrompt(BasePrompt):
@@ -147,6 +149,5 @@ PromptCollections = {
     "superglue-boolq": BoolQPrompt,
     "cb": CBPrompt,
 }
-    
 
-        
+

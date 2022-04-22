@@ -1,10 +1,10 @@
 from collections import OrderedDict
-import collections 
+import collections
 import abc
 import functools
 from selectors import EpollSelector
 from typing import Callable, List, Mapping
-from examples_prompt.trainers.trainer_utils import pad_punctuation
+from .utils import pad_punctuation
 from examples_prompt.metrics import metrics
 from .utils import round_stsb_target
 import datasets
@@ -12,119 +12,26 @@ import logging
 import numpy as np
 import torch
 import re
-from examples_prompt.data_processors.prompt import PromptCollections
+from openprompt.prompts import ManualTemplate, ManualVerbalizer
+from openprompt.plms.utils import TokenizerWrapper
+from openprompt.data_utils import InputExample
+from openprompt.prompts import GenerationVerbalizer
+import itertools
+
 
 logger = logging.getLogger(__name__)
 
-class AbstractTask(abc.ABC):
-    name = NotImplemented
-    config = NotImplemented
-    prefix = NotImplemented
-    metric = NotImplemented
-    metric_names = NotImplemented
-    split_map = None
-    labels_list = None
-    split_to_data_split: Mapping[str, str] = \
-        {"train": "train", "validation": "validation", "test": "test"}
-    small_datasets_without_all_splits = ["cola", "wnli", "rte", "superglue-cb", "superglue-copa", "superglue-multirc",
-                                         "superglue-wic", "superglue-wsc.fixed", "superglue-rte", "mrpc", "stsb",
-                                         "superglue-boolq"]
-    large_data_without_all_splits = ["qqp", "qnli", "superglue-record", "sst2"]
 
-    def __init__(self, config, seed=42):
-        self.config = config
-        self.seed = seed
 
-        tid = getattr(config, "template_id", 0)
-        vid = getattr(config, "verbalizer_id", 0)
-        generation_paradigm = getattr(config, "generation_paradigm", True)
-        self.prompt = PromptCollections[self.name](tid, vid, generation_paradigm)
+from transformers.models.auto.tokenization_auto import tokenizer_class_from_name
 
-    def get_max_target_length(self, tokenizer, default_max_length):
-        if self.prompt.verbalizer is not None:
-            return max([len(tokenizer.encode(label)) for key, label in self.prompt.verbalizer.items()])
-        return default_max_length
+from typing import List, Dict
+from collections import defaultdict
+from openprompt.utils import round_list
+import warnings
 
-    def seq2seq_format(self, source, target, extra_fields={}
-                       ):
-        
-        return {'source': ' '.join(source),
-                'target': ' '.join(target),
-                'task': self.name,
-                'extra_fields': extra_fields
-                }
 
-    def check_n_obs(self, n_obs, total_size):
-        if n_obs is not None and n_obs > total_size:
-            n_obs = total_size
-            logger.warning("n_obs is set to %s", n_obs)
-        return n_obs
-   
-    def shuffled_indices(self, dataset):
-        num_samples = len(dataset)
-        generator = torch.Generator()
-        generator.manual_seed(self.seed)
-        return torch.randperm(num_samples, generator=generator).tolist()
-
-    def subsample(self, dataset, n_obs=None, indices=None):
-        """
-        Given a dataset returns the subsampled dataset.
-        :param n_obs: the number of samples of the subsampled dataset.
-        :param indices: indices to select the samples from, if not given, indices are computed
-        from by shuffling the given dataset.
-        :return: subsampled dataset.
-        """
-        num_samples = len(dataset)
-        n_obs = self.check_n_obs(n_obs, num_samples)
-        if indices is None:
-           indices = self.shuffled_indices(dataset)
-        indices = indices[:n_obs]
-        return dataset.select(indices)
-
-    def load_dataset(self, split: int):
-        return datasets.load_dataset(self.name, self.config, split=split, script_version="master")
-
-    def get_split_indices(self, split, dataset, validation_size):
-        indices = self.shuffled_indices(dataset)
-        if split == "validation":
-            return indices[:validation_size]
-        else:
-            return indices[validation_size:]
-
-        
-    def map_dataset(self, dataset, add_prefix):  
-        # from IPython import embed; embed(header="in get target length")  
-        return dataset.map(self.preprocessor)
-    
-        
-    def preprocessor(self, example):
-        source, target = self.prompt(example)
-        return self.seq2seq_format(source, target, extra_fields={})
-                        
-    def get(self, split, add_prefix=True, n_obs=None, split_validation_test=False):
-        # For small datasets (n_samples < 10K) without test set, we divide validation set to
-        # half, use one half as test set and one half as validation set.
-        if split_validation_test and self.name in self.small_datasets_without_all_splits \
-                and split != "train":
-            mapped_split = self.split_to_data_split["validation"]
-            dataset = self.load_dataset(split=mapped_split)
-            indices = self.get_split_indices(split, dataset, validation_size=len(dataset)//2)
-            dataset = self.subsample(dataset, n_obs, indices)
-        # For larger datasets (n_samples > 10K), we divide training set into 1K as
-        # validation and the rest as training set, keeping the original validation
-        # set as the test set.
-        elif split_validation_test and self.name in self.large_data_without_all_splits \
-                and split != "test":
-            dataset = self.load_dataset(split="train")
-            indices = self.get_split_indices(split, dataset, validation_size=1000)
-            dataset = self.subsample(dataset, n_obs, indices)
-        else:
-            mapped_split = self.split_to_data_split[split]
-            dataset = self.load_dataset(split=mapped_split)
-            # shuffles the data and samples it.
-            if n_obs is not None:
-                dataset = self.subsample(dataset, n_obs)
-        return self.map_dataset(dataset, add_prefix)    
+from .processor import AbstractTask
 
 class Squad(AbstractTask):
     name = "squad"
@@ -143,25 +50,7 @@ class Squad(AbstractTask):
         return self.seq2seq_format(source, target, add_prefix)
 
 
-class MRPC(AbstractTask):
-    name = "mrpc"
-    labels_list = ["0", "1"]
-    metric = [metrics.f1_score, metrics.accuracy]
-    metric_names = ["f1", "accuracy"]
-    split_to_data_split = {"train": "train",
-                           "validation": "validation",
-                           "test": "validation"}
-
-    def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'mrpc', split=split, script_version="master")
-
-    # def preprocessor(self, example, add_prefix=True):
-    #     src_texts = ["sentence1:", example['sentence1'],
-    #                  "sentence2:", example["sentence2"]]
-    #     tgt_texts = [str(example['label'])]
-    #     return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
-
-
+##GLUE
 class COLA(AbstractTask):
     name = "cola"
     labels_list = ["0", "1"]
@@ -171,14 +60,19 @@ class COLA(AbstractTask):
                            "validation": "validation",
                            "test": "validation"}
 
-    def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'cola',
-                                     split=split, script_version="master")
+    templates_text = {"0": """sentence: {"meta": 'sentence', "shortenable":True} Are there any error in the sentence? {"mask"}""",
+    }
 
-    # def preprocessor(self, example, add_prefix=True):
-    #     src_texts = ["sentence:", example['sentence']]
-    #     tgt_texts = [str(example['label'])]
-    #     return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
+    verbalizers = {
+        "0":{ "0": "yes", "1": "no"}
+    }
+
+    def load_dataset(self, split):
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.cola")[split]
+        else:
+            return datasets.load_dataset('glue', 'cola',
+                                     split=split, script_version="master")
 
 
 class SST2(AbstractTask):
@@ -190,34 +84,50 @@ class SST2(AbstractTask):
                            "validation": "validation",
                            "test": "validation"}
 
+    verbalizers = {
+        "0":{"0":"negative","1":"positive"}
+    }
+
+    templates_text = {
+        "0":"""The sentiment of sentence: "{"meta":"sentence", "shortenable":True} is {"mask"}."""
+    }
+
     def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'sst2',
-                                     split=split, script_version="master")
-
-    def preprocessor(self, example, add_prefix=True):
-        src_texts = ["sentence:", example['sentence']]
-        tgt_texts = [str(example['label'])]
-        return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.sst2")[split]
+        else:
+            return datasets.load_dataset('glue', 'sst2',
+                                        split=split, script_version="master")
 
 
-class STSB(AbstractTask):
-    name = "stsb"
-    labels_list = [str(np.round(label, decimals=1)) for label in np.arange(0, 5.2, 0.2)]
-    metric = [metrics.pearson_corrcoef, metrics.spearman_corrcoef]
-    metric_names = ["pearson", "spearmanr"]
+
+class MRPC(AbstractTask):
+    name = "mrpc"
+    labels_list = ["0", "1"]
+    metric = [metrics.f1_score, metrics.accuracy]
+    metric_names = ["f1", "accuracy"]
     split_to_data_split = {"train": "train",
                            "validation": "validation",
                            "test": "validation"}
 
-    def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'stsb',
-                                     split=split, script_version="master")
 
-    def preprocessor(self, example, add_prefix=True):
-        src_texts = ["sentence1:", example['sentence1'],
-                     "sentence2:", example["sentence2"]]
-        tgt_texts = [str(round_stsb_target(example['label']))]
-        return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
+    templates_text = {
+        "0": """sentence1: {"meta": 'sentence1', "shortenable":True}. sentence2: {"meta":"sentence2", "shortenable":True}. Are sentence1 and sentence2 equivalent? {"mask"}.""",
+    }
+
+    verbalizers = {
+        "0":{"0": "no","1": "yes"}
+    }
+
+
+
+
+    def load_dataset(self, split):
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.mrpc")[split]
+        else:
+            return datasets.load_dataset('glue', 'mrpc', split=split, script_version="master")
+
 
 
 class QQP(AbstractTask):
@@ -229,14 +139,46 @@ class QQP(AbstractTask):
                            "validation": "validation",
                            "test": "validation"}
 
+    templates_text = {"0":
+        """question1: {"meta": 'question1', "shortenable":True}. question2: {"meta": 'question2', "shortenable":True} Are question1 and question2 equivalent? {"mask"}."""
+    }
+
+    verbalizers = {
+        "0":{"0": "no","1": "yes"}
+    }
+
+
     def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'qqp',
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.qqp")[split]
+        else:
+            return datasets.load_dataset('glue', 'qqp',
+                                     split=split, script_version="master")
+
+
+
+class STSB(AbstractTask):
+    name = "stsb"
+    labels_list = [str(np.round(label, decimals=1)) for label in np.arange(0, 5.2, 0.2)]
+    metric = [metrics.pearson_corrcoef, metrics.spearman_corrcoef]
+    metric_names = ["pearson", "spearmanr"]
+    split_to_data_split = {"train": "train",
+                           "validation": "validation",
+                           "test": "validation"}
+
+
+    verbalizers = {
+        ""
+    }
+
+    def load_dataset(self, split):
+        return datasets.load_dataset('glue', 'stsb',
                                      split=split, script_version="master")
 
     def preprocessor(self, example, add_prefix=True):
-        src_texts = ["question1:", example['question1'],
-                     "question2:", example["question2"]]
-        tgt_texts = [str(example['label'])]
+        src_texts = ["sentence1:", example['sentence1'],
+                     "sentence2:", example["sentence2"]]
+        tgt_texts = [str(round_stsb_target(example['label']))]
         return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
@@ -250,14 +192,29 @@ class MNLI(AbstractTask):
     metric_names = ["accuracy"]
 
 
-    def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'mnli', split=split, script_version="master")
+    templates_text = {
+        "0":"""premise: {"meta": 'premise', "shortenable":True}. hypothesis: {"meta": 'hypothesis', "shortenable":True} Does the premise entails the hypothesis? {"mask"}.""",
+    }
 
-    def preprocessor(self, example, add_prefix=True):
-        src_texts = ["premise:", example['premise'],
-                     "hypothesis", example["hypothesis"]]
-        tgt_texts = [str(example['label'])]
-        return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
+    verbalizers = {
+        "0":{
+            "0": "yes",
+            "1": "neutral",
+            "2": "no",
+        }
+    }
+
+    def load_dataset(self, split):
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.mnli")[split]
+        else:
+            return datasets.load_dataset('glue', 'mnli', split=split, script_version="master")
+
+    # def preprocessor(self, example, add_prefix=True):
+    #     src_texts = ["premise:", example['premise'],
+    #                  "hypothesis", example["hypothesis"]]
+    #     tgt_texts = [str(example['label'])]
+    #     return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
 class QNLI(AbstractTask):
@@ -269,15 +226,35 @@ class QNLI(AbstractTask):
                            "validation": "validation",
                            "test": "validation"}
 
+    templates_text = {
+        "0": """premise: {"meta": 'sentence', "shortenable":True}. hypothesis: {"meta": 'question', "shortenable":True}"""+
+        """Does the premise entails the hypothesis? {"mask"}.""",
+    }
+
+    verbalizers = {
+        "0":{
+            "0": "yes",
+            "1": "no",
+        }
+    }
+
+
     def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'qnli', split=split, script_version="master")
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.qnli")[split]
+        else:
+            return datasets.load_dataset('glue', 'qnli', split=split, script_version="master")
 
-    def preprocessor(self, example, add_prefix=True):
-        src_texts = ["question:", example['question'],
-                     "sentence:", example["sentence"]]
-        tgt_texts = [str(example['label'])]
-        return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
+    # def load_dataset(self, split):
+    #     return datasets.load_dataset('glue', 'qnli', split=split, script_version="master")
 
+    # def preprocessor(self, example, add_prefix=True):
+    #     src_texts = ["question:", example['question'],
+    #                  "sentence:", example["sentence"]]
+    #     tgt_texts = [str(example['label'])]
+    #     return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
+
+#Tested
 class RTE(AbstractTask):
     name = "rte"
     labels_list = ["0", "1"]
@@ -287,15 +264,24 @@ class RTE(AbstractTask):
                            "validation": "validation",
                            "test": "validation"}
 
+
+    templates_text = {
+        "0": """sentence1: {"meta": 'sentence1', "shortenable":True} sentence2: {"meta":"sentence2", "shortenable":True} The answer was {"mask"}.""",
+    }
+
+    verbalizers = {
+        "0":{"0": "yes",
+            "1": "no"
+        }
+    }
+
     def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'rte',
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.rte")[split]
+        else:
+            return datasets.load_dataset('glue', 'rte',
                                      split=split, script_version="master")
 
-    def preprocessor(self, example, add_prefix=True):
-        src_texts = ["sentence1:", example['sentence1'],
-                     "sentence2:", example["sentence2"]]
-        tgt_texts = [str(example['label'])]
-        return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
 
 
 class WNLI(AbstractTask):
@@ -307,16 +293,23 @@ class WNLI(AbstractTask):
                            "validation": "validation",
                            "test": "validation"}
 
+    verbalizers = {
+        "0":{"0": "True",
+            "1": "False",
+            }
+    }
+    templates_text = {"0": """{"meta": 'sentence1',"shortenable":True} Does it mean the following: "{"meta":'sentence2'}"? {"mask"}."""
+    }
+
+
     def load_dataset(self, split):
-        return datasets.load_dataset('glue', 'wnli', split=split, script_version="master")
-
-    def preprocessor(self, example, add_prefix=True):
-        src_texts = ["sentence1:", example['sentence1'],
-                     "sentence2:", example["sentence2"]]
-        tgt_texts = [str(example['label'])]
-        return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.wnli")[split]
+        else:
+            return datasets.load_dataset('glue', 'wnli', split=split, script_version="master")
 
 
+#SuperGLUE
 class SuperGLUEBoolQ(AbstractTask):
     name="superglue-boolq"
     labels_list = ['0', '1']
@@ -326,34 +319,25 @@ class SuperGLUEBoolQ(AbstractTask):
                            "validation": "validation",
                            "test": "validation"}
 
-    def load_dataset(self, split):
-        return datasets.load_dataset('super_glue', 'boolq', split=split, script_version="master")
+    verbalizers = {
+        "0": {
+            "0": "no",
+            "1": "yes"
+        },
+    }
 
-    def preprocessor(self, example, add_prefix=True):
-        src_texts = ["question:", example["question"], "passage:", example["passage"]]
-        tgt_texts = [str(example["label"])]
-        return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
-
-
-class SuperGLUERTE(AbstractTask):
-    name="superglue-rte"
-    labels_list = ['0', '1']
-    split_to_data_split = {"train": "train",
-                           "validation": "validation",
-                           "test": "validation"}
-    metric = [metrics.accuracy]
-    metric_names = ["accuracy"]
+    templates_text = {
+        "0": """hypothesis: {"meta": "question", "shortenable":True} premise: {"meta":"passage", "shortenable":True} The answer was {"mask"}."""
+    }
 
     def load_dataset(self, split):
-        return datasets.load_dataset('super_glue', 'rte', split=split, script_version="master")
-
-    def preprocessor(self, example, add_prefix=True):
-        src_texts = ["premise:", example["premise"],
-                     "hypothesis:", example["hypothesis"]]
-        tgt_texts = [str(example["label"])]
-        return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/super_glue.boolq")[split]
+        else:
+            return datasets.load_dataset('super_glue', 'boolq', split=split, script_version="master")
 
 
+#
 class SuperGLUECB(AbstractTask):
     name = "superglue-cb"
     labels_list = ['0', '1', '2']
@@ -363,13 +347,21 @@ class SuperGLUECB(AbstractTask):
     metric = [metrics.mean_multiclass_f1(num_classes=3), metrics.accuracy]
     metric_names = ["f1_multiclass", "accuracy"]
 
-    def load_dataset(self, split):
-        return datasets.load_dataset('super_glue', 'cb', split=split, script_version="master")
+    verbalizers = {
+        "0":{"0": "yes",
+            "1": "no",
+            "2": "maybe"
+        }
+    }
+    templates_text = {
+        "0": """hypothesis: {"meta": 'hypothesis',"shortenable":True} premise: {"meta":'premise', "shortenable":True} The answer was {"mask"}."""
+    }
 
-    def preprocessor(self, example, add_prefix=True):
-        src_texts = ["premise:", example["premise"], "hypothesis:", example["hypothesis"]]
-        tgt_texts = [str(example["label"])]
-        return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
+    def load_dataset(self, split):
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/super_glue.cb")[split]
+        else:
+            return datasets.load_dataset('super_glue', 'cb', split=split, script_version="master")
 
 
 class SuperGLUECOPA(AbstractTask):
@@ -379,17 +371,23 @@ class SuperGLUECOPA(AbstractTask):
                            "validation": "validation",
                            "test": "validation"}
     metric = [metrics.accuracy]
-    metric_names = ["accuracy"] 
+    metric_names = ["accuracy"]
+
+    verbalizers = {
+        "0":{
+            "0": "1",
+            "1": "2",
+        }
+    }
+    templates_text = {
+       "0": """choice1: {"meta":"choice1"} choice2: {"meta":"choice2"} premise: {"meta":"premise", "shortenable":True} The {"meta":"question"} answer was choice{"mask"}."""
+    }
 
     def load_dataset(self, split):
-        return datasets.load_dataset('super_glue', 'copa', split=split, script_version="master")
-
-    def preprocessor(self, example, add_prefix=True):
-        src_texts = ["premise:", example["premise"], 
-                     "choice1:", example["choice1"],
-                     "choice2:", example["choice2"]]
-        tgt_texts = [str(example["label"])]
-        return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/super_glue.copa")[split]
+        else:
+            return datasets.load_dataset('super_glue', 'copa', split=split, script_version="master")
 
 
 class SuperGLUEMultiRC(AbstractTask):
@@ -398,31 +396,44 @@ class SuperGLUEMultiRC(AbstractTask):
     split_to_data_split = {"train": "train",
                            "validation": "validation",
                            "test": "validation"}
-    metric = [metrics.multirc_f1_over_all_answers,
-              metrics.mean_group_metric(metrics.exact_match)]
+    metric = [metrics.f1_score,
+              metrics.accuracy]
     metric_names = ["f1", "em"]
 
+
+    verbalizers = {
+        "0": {
+        "0": "no",
+        "1": "yes",
+        }
+    }
+    templates_text = {
+        "0": """question: {"meta":"question", "shortenable":False} answer: {"meta":"answer", "shortenable":False, "post_processing": lambda x:x+"."} paragraph: {"meta":"paragraph", "shortenable":True} The answer was {"mask"}."""
+    }
+
+
     def load_dataset(self, split):
-        return datasets.load_dataset('super_glue', 'multirc', split=split, script_version="master")
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/super_glue.multirc")[split]
+        else:
+            return datasets.load_dataset('super_glue', 'multirc', split=split, script_version="master")
 
     def remove_markup(self, text):
         """Removes the HTML markup."""
         text = re.sub('<br>', ' ', text)
         text = re.sub('<(/)?b>', '', text)
-        return text 
+        return text
 
-    def preprocessor(self, example, add_prefix=True):
-        group = example['idx']['question']
-        # T5 applies remove_markup to the joined string, but this should not make 
+    def preprocessor(self, example):
+        # T5 applies remove_markup to the joined string, but this should not make
         # any difference as well.
-        # https://github.com/google-research/text-to-text-transfer-transformer/blob/a1352e625db7ec114062f99d99b0565b9e45c155/t5/data/preprocessors.py#L797 
-        src_texts = ["question:", self.remove_markup(example["question"]),
-                     "answer:", self.remove_markup(example["answer"]),
-                     "paragraph:", self.remove_markup(example["paragraph"])]
-        tgt_texts = [str(example["label"])]
-        return self.seq2seq_format(src_texts, tgt_texts, add_prefix, extra_fields={"group": group})
+        # https://github.com/google-research/text-to-text-transfer-transformer/blob/a1352e625db7ec114062f99d99b0565b9e45c155/t5/data/preprocessors.py#L797
+        example["question"] = self.remove_markup(example["question"])
+        example["answer"] = self.remove_markup(example["answer"])
+        example["paragraph"] = self.remove_markup(example["paragraph"])
+        return example
 
-   
+
 
 class SuperGLUEWIC(AbstractTask):
     name = "superglue-wic"
@@ -431,130 +442,115 @@ class SuperGLUEWIC(AbstractTask):
                            "validation": "validation",
                            "test": "validation"}
     metric = [metrics.accuracy]
-    metric_names = ["accuracy"] 
+    metric_names = ["accuracy"]
+
+    verbalizers = {
+        "0": {
+        "0": "No",
+        "1": "Yes",
+        }
+    }
+
+    templates_text = {
+        "0": """sentence1: {"meta":"sentence1"} sentence2: {"meta":"sentence2", "shortenable": True} word: {"meta":"word"} {"mask"}."""
+    }
 
     def load_dataset(self, split):
-        return datasets.load_dataset('super_glue', 'wic', split=split, script_version="master")
-
-    def preprocessor(self, example, add_prefix=True):
-        src_texts = ["sentence1:", example["sentence1"],
-                     "sentence2:", example["sentence2"],
-                     "word:", example["word"]]
-        tgt_texts = [str(example["label"])]
-        return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/super_glue.wic")[split]
+        else:
+            return datasets.load_dataset('super_glue', 'wic', split=split, script_version="master")
 
 
-class SuperGLUEWSCFixed(AbstractTask):
-    # source: https://github.com/google-research/text-to-text-transfer-transformer/blob/master/t5/data/preprocessors.py
-    """Convert WSC examples to text2text format.
-     WSC includes a sentence along with 2 'spans': the first denoting a noun and
-     the other a pronoun. The 'label' specifies whether or not the pronoun is
-     referencing the noun. This preprocessor puts ' * ' around the noun and ' # '
-     around the pronoun.
-     For example, a typical example from WSC might look like
-     {
-         'text': 'This is a test sentence .',
-         'span1_text': 'test',
-         'span1_index': 3,
-         'span2_text': 'This',
-         'span2_index': 0,
-         'label': 0
-     }
-     This example would be transformed to
-     {
-         'inputs': 'wsc text: # This # is a * test * sentence .',
-         'targets': 'False'
-     }
-    """
-    name = "superglue-wsc.fixed"
-    labels_list = ['0', '1']
+# class SuperGLUERecord(AbstractTask):
+#     """Convert ReCoRD examples to text2text examples.
+#     ReCoRD contains a passage, query containing a '@placeholder' string, and a set
+#     of entities that are the possible values of the placeholder. Each train and
+#     validation example will have a list of answers, any of which would be
+#     considered correct.
+#     For example, a typical example from ReCoRD might look like
+#     {
+#       'passsage': 'This is the passage.',
+#       'query': 'A @placeholder is a bird.',
+#       'entities': ['penguin', 'potato', 'pigeon'],
+#       'answers': ['penguin', 'pigeon'],
+#     }
+#     which this preprocessor would turn into the following two examples:
+#     {
+#       'inputs': 'record query: A @placeholder is a bird. entities: penguin, '
+#                 'potato, pigeon passage: This is the passage.',
+#       'targets': 'penguin',
+#     }
+#     and
+#     {
+#       'inputs': 'record query: A @placeholder is a bird. entities: penguin, '
+#                 'potato, pigeon passage: This is the passage.',
+#       'targets': 'pigeon',
+#     }
+#     """
+#     name = "superglue-record"
+#     split_to_data_split = {"train": "train",
+#                            "validation": "validation",
+#                            "test": "validation"}
+#     metric = [metrics.squad]
+#     metric_names = ["squad"]
+
+#     def load_dataset(self, split):
+#         return datasets.load_dataset('super_glue', 'record', split=split, script_version="master")
+
+#     def preprocessor(self, batch, add_prefix=True):
+#         new_batch = collections.defaultdict(list)
+#         keys = batch.keys()
+#         for values in zip(*batch.values()):
+#             ex = {k: v for k, v in zip(keys, values)}
+#             # updates the passage.
+#             passage = ex['passage']
+#             passage = re.sub(r'(\.|\?|\!|\"|\')\n@highlight\n', r'\1 ', passage)
+#             passage = re.sub(r'\n@highlight\n', '. ', passage)
+#             inputs = f"record query: {ex['query']} entities: {', '.join(ex['entities'])} passage: {passage}"
+#             if add_prefix:
+#                 inputs = self.name + " " + inputs
+#             # duplicates the samples based on  number of answers.
+#             num_answers = len(ex["answers"])
+#             num_duplicates = np.maximum(1, num_answers)
+#             new_batch["source"].extend([inputs] * num_duplicates)
+#             new_batch["target"].extend(ex["answers"] if num_answers > 0 else ["<unk>"])
+#             new_batch["task"].extend([self.name] * num_duplicates)
+#             new_batch["extra_fields"].extend([{"answers": ex["answers"]}]*num_duplicates)
+#         return new_batch
+
+#     def map_dataset(self, dataset, add_prefix=True):
+#         return dataset.map(functools.partial(self.preprocessor, add_prefix=add_prefix),
+#             batched=True, remove_columns=dataset.column_names)
+
+class Beans(AbstractTask):
+    name = "beans"
+    labels_list = ['angular_leaf_spot', 'bean_rust', "healthy"]
     split_to_data_split = {"train": "train",
                            "validation": "validation",
                            "test": "validation"}
     metric = [metrics.accuracy]
-    metric_names = ["accuracy"] 
+    metric_names = ["accuracy"]
+
+    verbalizers = {
+        "0": {
+        "0": "No",
+        "1": "Yes",
+        }
+    }
+
+    templates_text = {
+        "0": """{"meta":"sentence1"}"""
+    }
 
     def load_dataset(self, split):
-        return datasets.load_dataset('super_glue', 'wsc.fixed', split=split, script_version="master")
-
-    def _mark_span(self, text, span_str, span_idx, mark):
-        pattern_tmpl = r'^((?:\S+\s){N})(W)'
-        pattern = re.sub('N', str(span_idx), pattern_tmpl)
-        pattern = re.sub('W', span_str, pattern)
-        return re.sub(pattern, r'\1{0} \2 {0}'.format(mark), text)
-
-    def preprocessor(self, example, add_prefix=True):
-        # converts text as done in T5.
-        text = example['text']
-        text = self._mark_span(text, example['span1_text'], example['span1_index'], '*')
-        # Compensate for 2 added "words" added in previous step.
-        span2_index = example['span2_index'] + 2 * int(example['span1_index'] < example['span2_index'])
-        text = self._mark_span(text, example['span2_text'], span2_index, '#')
-        src_texts = ["text:", text]
-        tgt_texts = [str(example["label"])]
-        return self.seq2seq_format(src_texts, tgt_texts, add_prefix)
+        # from IPython import embed; embed(header="beans")
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/super_glue.wic")[split]
+        else:
+            return datasets.load_dataset('beans', split=split, script_version="master")
 
 
-class SuperGLUERecord(AbstractTask):
-    """Convert ReCoRD examples to text2text examples.
-    ReCoRD contains a passage, query containing a '@placeholder' string, and a set
-    of entities that are the possible values of the placeholder. Each train and
-    validation example will have a list of answers, any of which would be
-    considered correct.
-    For example, a typical example from ReCoRD might look like
-    {
-      'passsage': 'This is the passage.',
-      'query': 'A @placeholder is a bird.',
-      'entities': ['penguin', 'potato', 'pigeon'],
-      'answers': ['penguin', 'pigeon'],
-    }
-    which this preprocessor would turn into the following two examples:
-    {
-      'inputs': 'record query: A @placeholder is a bird. entities: penguin, '
-                'potato, pigeon passage: This is the passage.',
-      'targets': 'penguin',
-    }
-    and
-    {
-      'inputs': 'record query: A @placeholder is a bird. entities: penguin, '
-                'potato, pigeon passage: This is the passage.',
-      'targets': 'pigeon',
-    }
-    """
-    name = "superglue-record"
-    split_to_data_split = {"train": "train",
-                           "validation": "validation",
-                           "test": "validation"}
-    metric = [metrics.squad]
-    metric_names = ["squad"] 
-    
-    def load_dataset(self, split):
-        return datasets.load_dataset('super_glue', 'record', split=split, script_version="master")
-
-    def preprocessor(self, batch, add_prefix=True):
-        new_batch = collections.defaultdict(list)
-        keys = batch.keys()
-        for values in zip(*batch.values()):
-            ex = {k: v for k, v in zip(keys, values)}
-            # updates the passage.
-            passage = ex['passage']
-            passage = re.sub(r'(\.|\?|\!|\"|\')\n@highlight\n', r'\1 ', passage)
-            passage = re.sub(r'\n@highlight\n', '. ', passage)
-            inputs = f"record query: {ex['query']} entities: {', '.join(ex['entities'])} passage: {passage}"
-            if add_prefix:
-                inputs = self.name + " " + inputs 
-            # duplicates the samples based on  number of answers.
-            num_answers = len(ex["answers"])
-            num_duplicates = np.maximum(1, num_answers)
-            new_batch["source"].extend([inputs] * num_duplicates) 
-            new_batch["target"].extend(ex["answers"] if num_answers > 0 else ["<unk>"])
-            new_batch["task"].extend([self.name] * num_duplicates)
-            new_batch["extra_fields"].extend([{"answers": ex["answers"]}]*num_duplicates) 
-        return new_batch
-    
-    def map_dataset(self, dataset, add_prefix=True):
-        return dataset.map(functools.partial(self.preprocessor, add_prefix=add_prefix), 
-            batched=True, remove_columns=dataset.column_names)
 
 
 TASK_MAPPING = OrderedDict(
@@ -570,21 +566,20 @@ TASK_MAPPING = OrderedDict(
         ('qqp', QQP),
         ('stsb', STSB),
         ('superglue-boolq', SuperGLUEBoolQ),
-        ('superglue-rte', SuperGLUERTE),
         ('superglue-cb', SuperGLUECB),
         ('superglue-copa', SuperGLUECOPA),
         ('superglue-multirc', SuperGLUEMultiRC),
         ('superglue-wic', SuperGLUEWIC),
-        ('superglue-wsc.fixed', SuperGLUEWSCFixed),
-        ('superglue-record', SuperGLUERecord)
+        # ('superglue-record', SuperGLUERecord)
+        ('beans', Beans)
     ]
 )
 
 class AutoTask:
     @classmethod
-    def get(self, task, config, seed=42):
+    def get(self, task, config, data_args, seed=42):
         if task in TASK_MAPPING:
-            return TASK_MAPPING[task](config, seed)
+            return TASK_MAPPING[task](config, data_args, seed)
         raise ValueError(
             "Unrecognized task {} for AutoTask Model: {}.\n"
             "Task name should be one of {}.".format(

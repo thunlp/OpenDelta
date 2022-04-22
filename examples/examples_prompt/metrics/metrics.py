@@ -45,12 +45,51 @@ def spearman_corrcoef(predictions, targets) -> dict:
         spearman_corrcoef = 0
     return {"spearmanr": spearman_corrcoef}
 
+
+
+def spearman_corrcoef(predictions, targets) -> dict:
+    """Computes Spearman correlation coefficient."""
+    # TODO: we need to do postprocessors in a clean way for each dataset.
+    from examples_seq2seq.data_processors.postprocessors import string_to_float
+    targets = [string_to_float(target) for target in targets]
+    predictions= [string_to_float(prediction) for prediction in predictions]
+    spearman_corrcoef = 100 * scipy.stats.spearmanr(targets, predictions)[0]
+
+    # Note that if all the predictions will be the same, spearman
+    # correlation is nan, to gaurad against this, we check the output
+    # and return 0 in this case.
+    if math.isnan(spearman_corrcoef):
+        spearman_corrcoef = 0
+    return {"spearmanr": spearman_corrcoef}
+
+
+def f1_score_with_invalid(predictions, targets) -> dict:
+    """Computes F1 score,  with any prediction != 0 or 1 is counted as incorrect.
+    Args:
+      targets: list of targets, either 0 or 1
+      predictions: list of predictions, any integer value
+    Returns:
+      F1 score, where any prediction != 0 or 1 is counted as wrong.
+    """
+    def binary_reverse(labels):
+       return ['0' if label == '1' else '1' for label in labels]
+    targets, predictions = np.asarray(targets), np.asarray(predictions)
+    # Get indices of invalid predictions.
+    invalid_idx_mask = np.logical_and(predictions != '0', predictions != '1')
+    # For any prediction != 0 or 1, we set the prediction to the opposite of its corresponding target.
+    predictions[invalid_idx_mask] = binary_reverse(targets[invalid_idx_mask])
+    targets = targets.astype(np.int32)
+    predictions = predictions.astype(np.int32)
+    return {"f1": 100 * sklearn.metrics.f1_score(targets, predictions)}
+
+
+
 def transform_for_generation(predictions, targets):
     mapping = {k: i for i, k in enumerate(set(targets))}
 
     targets  = np.asarray([mapping[k] for k in targets])
     predictions = np.asarray([mapping[k] if k in mapping else (t+1)%len(mapping) for t, k in zip(targets, predictions)])
-    
+
     return predictions, targets
 
 
