@@ -25,7 +25,7 @@ log.txt
 !examples/jupyter_notebook_examples/*.py
 
 
-!**/examples/*/configs/config_gen.py
+!**/examples/*/configs/*.py
 **/outputs_search/**/*.bin
 **/outputs_search/**/*.pt
 

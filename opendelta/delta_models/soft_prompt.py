@@ -66,7 +66,7 @@ class SoftPromptLayer(nn.Module):
         assert self.num_tokens>0
         self.instantiate(raw_embedding(torch.tensor([0])).shape[-1])
 
-        self.all_pseudo_tokens = {}
+        # self.all_pseudo_tokens = {}
 
     def pre_forward(self, *args, **kwargs):
         # if attention_mask is passed as PLM's input, modify it here
@@ -108,15 +108,15 @@ class SoftPromptLayer(nn.Module):
         for expand_key in self.other_expand_ids:
             if expand_key in kwargs:
                 real_tokens = kwargs[expand_key]
-                if expand_key in self.all_pseudo_tokens:
-                    pseudo_tokens = self.all_pseudo_tokens[expand_key].to(real_tokens.device)
-                else:
-                    pseudo_tokens_value = self.other_expand_ids[expand_key]
-                    pseudo_tokens = torch.ones(
-                        (*real_tokens.shape[:-1], inputs_embeds.shape[-2]-real_tokens.shape[-1]),
-                        dtype = real_tokens.dtype,
-                        device=real_tokens.device) * pseudo_tokens_value
-                    self.all_pseudo_tokens[expand_key] = pseudo_tokens
+                # if expand_key in self.all_pseudo_tokens:
+                #     pseudo_tokens = self.all_pseudo_tokens[expand_key].to(real_tokens.device)
+                # else:
+                pseudo_tokens_value = self.other_expand_ids[expand_key]
+                pseudo_tokens = torch.ones(
+                    (*real_tokens.shape[:-1], inputs_embeds.shape[-2]-real_tokens.shape[-1]),
+                    dtype = real_tokens.dtype,
+                    device=real_tokens.device) * pseudo_tokens_value
+                    # self.all_pseudo_tokens[expand_key] = pseudo_tokens
                 real_tokens.data = torch.cat([pseudo_tokens, real_tokens], dim=-1)
 
         return args, kwargs
