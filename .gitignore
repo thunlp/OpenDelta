@@ -17,17 +17,16 @@ _build/
 outputs/
 log.txt
 **/DeltaHub/
+**/sfs_scripts/
 *beans/
-**/examples/*/configs/
-
+**/examples/*/configs/*
 !examples/*/configs/config_gen.py
 **/jupyter_notebook_examples/
 !examples/jupyter_notebook_examples/*.py
-
-
-!**/examples/*/configs/*.py
+!examples/*/configs/*.py
 **/outputs_search/**/*.bin
 **/outputs_search/**/*.pt
+
 
 *.db
 **/nohup.out
