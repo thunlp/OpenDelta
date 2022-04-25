@@ -1,5 +1,4 @@
-# Appling OpenDelta to GLUE/SuperGLUE tasks using Seq2Seq Paradigm
-
+# !!!!This example collection is still under develop, please wait for some time to use it.
 
 ## install the repo
 ```bash
