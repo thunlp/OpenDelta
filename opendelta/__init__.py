@@ -21,6 +21,7 @@ from .delta_models.adapter import AdapterModel
 from .delta_models.prefix import PrefixModel
 from .delta_models.soft_prompt import SoftPromptModel
 from .delta_models.low_rank_adapter import LowRankAdapterModel
+from .delta_models.split import SplitModel
 from .utils.visualization import Visualization
 
 

@@ -1,4 +1,3 @@
-from examples_prompt.metrics.metrics import exact_match
 from opendelta.utils.signature import get_arg_names, get_arg_names_inside_func
 from opendelta.utils.name_based_addressing import *
 from opendelta.utils.cuda import get_device

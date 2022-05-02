@@ -5,7 +5,6 @@ from opendelta.utils.signature import get_arg_names, get_arg_names_inside_func
 from opendelta.utils.name_based_addressing import *
 from opendelta.basemodel import DeltaBase
 from transformers.models.t5 import T5ForConditionalGeneration
-import loralib as lora
 import torch.nn as nn
 from opendelta import BaseDeltaConfig
 import math
