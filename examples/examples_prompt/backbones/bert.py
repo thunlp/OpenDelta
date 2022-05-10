@@ -49,7 +49,7 @@ def mask_token_func(tokenizer, ith_mask=0):
     return tokenizer.mask_token
 
 def get_remove_columns(dataset_features):
-    dataset_features.pop("label")
+    dataset_features.remove("label")
     return dataset_features
 
 
@@ -60,6 +60,7 @@ def get_prompts(task, tokenizer, data_args, template_id="0", verbalizer_id="0"):
     template = ManualTemplate(text = task.templates_text[template_id])
     verbalizer = ManualVerbalizer(tokenizer=tokenizer, classes = task.labels_list, label_words=task.verbalizers[verbalizer_id])
     tokenizer_wrapper = TokenizerWrapper(max_seq_length=data_args.max_source_length, tokenizer=tokenizer, truncate_method="balanced", mask_token_func=mask_token_func)
+    from IPython import embed; embed()
     return template, verbalizer, tokenizer_wrapper
 
 class DataCollator(HfDataCollatorMixin):

@@ -5,21 +5,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from torch.utils.data.dataset import Dataset
 from transformers import Seq2SeqTrainer as HfSeq2SeqTrainner
-from examples_seq2seq.trainers.trainer import BaseTrainer 
+from examples_seq2seq.trainers.trainer import BaseTrainer
 
-    # if is_sagemaker_mp_enabled():
-#     import smdistributed.modelparallel.torch as smp
-
-# from transformers.trainer_utils import ShardedDDPOption
-
-# if is_fairscale_available():
-#     dep_version_check("fairscale")
-#     import fairscale
-#     from fairscale.nn.data_parallel import FullyShardedDataParallel as FullyShardedDDP
-#     from fairscale.nn.data_parallel import ShardedDataParallel as ShardedDDP
-#     from fairscale.nn.wrap import auto_wrap
-#     from fairscale.optim import OSS
-#     from fairscale.optim.grad_scaler import ShardedGradScaler
 
 from transformers.optimization import Adafactor, AdamW, get_scheduler
 from transformers.trainer_pt_utils import get_parameter_names, is_sagemaker_mp_enabled
@@ -121,7 +108,7 @@ class Seq2SeqTrainer(HfSeq2SeqTrainner, BaseTrainer):
 
         return (loss, generated_tokens, labels)
 
-    
-    
-    
-    
+
+
+
+

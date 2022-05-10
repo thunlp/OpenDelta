@@ -4,31 +4,58 @@ from transformers.data.data_collator import torch_default_data_collator
 from transformers.data.data_collator import DataCollatorMixin as HfDataCollatorMixin
 import numpy as np
 from transformers import (
-    AutoConfig,
-    AutoFeatureExtractor,
-    AutoModelForImageClassification,
+    CLIPConfig,
+    CLIPProcessor,
+    CLIPModel,
 )
 from transformers import ViTFeatureExtractor
-
+from PIL import Image
 from transformers import Trainer as HfTrainer
 import torch.nn as nn
 
 
-def get_prompts(task, tokenizer, data_args, template_id="0", verbalizer_id="0"):
-    # from openpromptu.prompts import ManualVerbalizer
-    # from openpromptu.prompts import ManualTemplate
-    # from openpromptu import TokenizerWrapper
-    # template = ManualTemplate(text = task.templates_text[template_id])
-    # verbalizer = ManualVerbalizer(tokenizer=tokenizer, classes = task.labels_list, label_words=task.verbalizers[verbalizer_id])
-    # tokenizer_wrapper = TokenizerWrapper(max_seq_length=data_args.max_source_length, tokenizer=tokenizer, truncate_method="balanced", mask_token_func=mask_token_func)
-    return None, None, None
+
+def get_prompts(task, tokenizer, data_args, template_id="clip", verbalizer_id="clip"):
+    from openpromptu.prompts import GenerationVerbalizer
+    from openpromptu.prompts import ManualTemplate
+    from openpromptu import TokenizerWrapper
+    template = ManualTemplate(text = task.templates_text[template_id])
+    verbalizer = GenerationVerbalizer(tokenizer=tokenizer, classes = task.labels_list, label_words=task.verbalizers[verbalizer_id])
+    tokenizer_wrapper = TokenizerWrapper(max_seq_length=data_args.max_source_length, tokenizer=tokenizer.tokenizer, truncate_method="balanced", mask_token_func=mask_token_func)
+    return template, verbalizer, tokenizer_wrapper
+
+def mask_token_func(tokenizer, ith_mask=0):
+    return tokenizer.mask_token
 
 def preprocess_function(raw_example, **kwargs):
     # from IPython import embed; embed(header="Therefa")
     tokenizer = kwargs['tokenizer']
-    model_inputs = tokenizer(raw_example['image'], return_tensors='pt')
-    model_inputs['pixel_values'] = model_inputs['pixel_values'].squeeze()
-    model_inputs['labels'] = raw_example['labels']
+
+    # ["a photo of {}" for i in range()]
+    data_args = kwargs['data_args']
+    template = kwargs['template']
+    verbalizer = kwargs['verbalizer']
+    tokenizer_wrapper = kwargs['tokenizer_wrapper']
+
+    example = InputExample(raw_example)
+
+    texts = []
+
+    for candidate_label in range(verbalizer.num_classes):
+        tgt_text = verbalizer.wrap_one_example(label=candidate_label)
+        wrapped_example, other = template.wrap_one_example(example)
+        input_sentence = tokenizer_wrapper.merge_wrapped_example(wrapped_example, tgt_texts=[tgt_text])
+        texts.append(input_sentence)
+
+    # from IPython import embed; embed()/
+
+    image = Image.open(raw_example['image_file_path'])
+
+    model_inputs = tokenizer(images=image,  text=texts, max_length=16, padding="max_length", truncation=True, return_tensors='pt')
+
+    # from IPython import embed; embed()
+    model_inputs["pixel_values"] = model_inputs["pixel_values"].squeeze()
+    model_inputs["label"] = example.label
     return model_inputs
 
 def compute_metrics(eval_preds, dataset_name, eval_metric):
@@ -50,11 +77,11 @@ def compute_metrics(eval_preds, dataset_name, eval_metric):
     result.update({"average_metrics":average_metric})
     return result
 
-def mask_token_func(tokenizer, ith_mask=0):
-    return tokenizer.mask_token
+
 
 def get_remove_columns(dataset_features):
-    # dataset_features.pop("label")
+    # from IPython import embed; embed(header="in remoev")
+    dataset_features.remove("labels")
     print("remove_columns: {}".format(dataset_features))
     return dataset_features
 
@@ -66,18 +93,20 @@ class DataCollator(HfDataCollatorMixin):
         # from IPython import embed; embed(header="in data collator")
         a = torch_default_data_collator(features=features)
         # from IPython import embed; embed(header="in data collator")
+        a["input_ids"] = a["input_ids"][0]
+        a["attention_mask"] = a["attention_mask"][0]
         return a
 
 
 def get_backbone(model_args, **kwargs):
-    config = AutoConfig.from_pretrained(
+    config = CLIPConfig.from_pretrained(
         model_args.config_name if model_args.config_name else model_args.model_name_or_path,
         cache_dir=model_args.cache_dir,
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    config.dropout_rate = 0.0
-    tokenizer = AutoFeatureExtractor.from_pretrained(
+    # config.dropout_rate = 0.0
+    tokenizer = CLIPProcessor.from_pretrained(
         model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
         cache_dir=model_args.cache_dir,
 
@@ -86,7 +115,7 @@ def get_backbone(model_args, **kwargs):
         use_auth_token=True if model_args.use_auth_token else None,
     )
 
-    model = AutoModelForImageClassification.from_pretrained(
+    model = CLIPModel.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
@@ -94,9 +123,9 @@ def get_backbone(model_args, **kwargs):
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    config.num_labels = model_args.num_classes
-    old_classifier = model.classifier
-    model.classifier = nn.Linear(old_classifier.in_features, config.num_labels)
+    # config.num_labels = model_args.num_classes
+    # old_classifier = model.classifier
+    # model.classifier = nn.Linear(old_classifier.in_features, config.num_labels)
 
 
     return config, tokenizer, model
@@ -110,11 +139,14 @@ class Trainer(HfTrainer):
         self.loss_fn = nn.CrossEntropyLoss()
 
     def compute_loss(self, model, inputs, return_outputs=False):
+        # from IPython import embed; embed()
         labels = inputs.pop('labels')
         outputs = model(**inputs)
-        logits = outputs.get("logits")
+        # logits = outputs.get("logits")
 
-        loss = self.loss_fn(logits, labels)
+
+        logits_per_image = outputs.logits_per_image
+        loss = self.loss_fn(logits_per_image, labels)
         return (loss, outputs) if return_outputs else loss
 
     def _compute_metrics(self, eval_preds):

@@ -1,4 +1,4 @@
-import collections 
+import collections
 import copy
 
 BS = 1
@@ -6,13 +6,13 @@ AllConfigs = {}
 
 BaseConfigs = {}
 BaseConfigs['t5-base'] = {
-                ("job_name", "task_name", "eval_dataset_name", "test_dataset_name", "num_train_epochs", 
+                ("job_name", "task_name", "eval_dataset_name", "test_dataset_name", "num_train_epochs",
                 "max_source_length",
                 "per_device_train_batch_size", "per_device_eval_batch_size", "warmup_steps","save_steps", "eval_steps"): zip(
                     ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record",
-                    "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"], 
-                    ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"], 
-                    ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"], 
+                    "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"],
+                    ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"],
+                    ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"],
                     ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte", "mnli", "qqp", "stsb"],
                     [ 20,  20,  40,  20,   3,   3,  20,  20,  20,   3,   3,  20,   3,   3,  20],
                     [256, 256, 256, 256, 256, 512, 256, 128, 128, 128, 128, 128, 128, 128, 128],
@@ -27,7 +27,7 @@ BaseConfigs['t5-base'] = {
                 "do_train": True,
                 "do_eval": True,
                 "do_test": True,
-                
+
                 "model_name_or_path": "t5-base",
                 "tokenizer_name": "t5-base",
                 "save_total_limit": 1,
@@ -50,13 +50,13 @@ BaseConfigs['t5-base'] = {
             }
 
 BaseConfigs['t5-large'] = {
-                ("job_name", "task_name", "eval_dataset_name", "test_dataset_name", "num_train_epochs", 
+                ("job_name", "task_name", "eval_dataset_name", "test_dataset_name", "num_train_epochs",
                 "max_source_length",
                 "per_device_train_batch_size", "per_device_eval_batch_size", "warmup_steps","save_steps", "eval_steps"): zip(
                     ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record",
-                    "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"], 
-                    ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"], 
-                    ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"], 
+                    "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"],
+                    ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"],
+                    ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"],
                     ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte", "mnli", "qqp", "stsb"],
                     [ 20,  20,  40,  20,   3,   3,  20,  20,  20,   3,   3,  20,   3,   3,  20],
                     [256, 256, 256, 256, 256, 512, 256, 128, 128, 128, 128, 128, 128, 128, 128],
@@ -71,7 +71,7 @@ BaseConfigs['t5-large'] = {
                 "do_train": True,
                 "do_eval": True,
                 "do_test": True,
-                
+
                 "model_name_or_path": "/home/hushengding/plm_cache/t5-large",
                 "tokenizer_name": "/home/hushengding/plm_cache/t5-large",
                 "save_total_limit": 1,
@@ -94,13 +94,13 @@ BaseConfigs['t5-large'] = {
             }
 
 BaseConfigs['t5-3b'] = {
-                ("job_name", "task_name", "eval_dataset_name", "test_dataset_name", "num_train_epochs", 
+                ("job_name", "task_name", "eval_dataset_name", "test_dataset_name", "num_train_epochs",
                 "max_source_length",
                 "per_device_train_batch_size", "per_device_eval_batch_size", "warmup_steps","save_steps", "eval_steps"): zip(
                     ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record",
-                    "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"], 
-                    ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"], 
-                    ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"], 
+                    "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"],
+                    ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"],
+                    ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte",  "mnli", "qqp", "stsb"],
                     ["superglue-boolq", "superglue-cb", "superglue-copa", "superglue-wic", "superglue-multirc", "superglue-record", "superglue-wsc.fixed", "mrpc", "cola", "sst2", "qnli", "rte", "mnli", "qqp", "stsb"],
                     [ 20,  20,  40,  20,   3,   3,  20,  20,  20,   3,   3,  20,   3,   3,  20],
                     [256, 256, 256, 256, 256, 512, 256, 128, 128, 128, 128, 128, 128, 128, 128],
@@ -115,7 +115,7 @@ BaseConfigs['t5-3b'] = {
                 "do_train": True,
                 "do_eval": True,
                 "do_test": True,
-                
+
                 "model_name_or_path": "/home/hushengding/plm_cache/t5-3b",
                 "tokenizer_name": "/home/hushengding/plm_cache/t5-3b",
                 "save_total_limit": 1,
@@ -139,8 +139,8 @@ BaseConfigs['t5-3b'] = {
 
 AllConfigs['bitfit_t5-base'] = copy.deepcopy(BaseConfigs['t5-base'])
 AllConfigs['bitfit_t5-base'].update({
-                "delta_type": "bitfit",      
-                "learning_rate": 3e-4,         
+                "delta_type": "bitfit",
+                "learning_rate": 3e-4,
                 "output_dir": "outputs/bitfit/t5-base/",
             })
 
@@ -185,16 +185,16 @@ AllConfigs['compacter_t5-base'].update({
                                 "non_linearity": "gelu_new",
 
                                 #Compacter.
-                                "hypercomplex_division": 4, 
+                                "hypercomplex_division": 4,
                                 "hypercomplex_adapters": True,
                                 "hypercomplex_nonlinearity": "glorot-uniform",
-                                # gradient clip and clamp 
+                                # gradient clip and clamp
                                 "gradient_clip": False,
                                 "phm_clamp": False,
-                                "normalize_phm_weight": False, 
+                                "normalize_phm_weight": False,
                                 "learn_phm": True,
-                                # shared one side 
-                                "factorized_phm": True, 
+                                # shared one side
+                                "factorized_phm": True,
                                 "shared_phm_rule": False,
                                 "factorized_phm_rule": False,
                                 "phm_c_init": "normal",
@@ -222,16 +222,16 @@ AllConfigs['compacter++_t5-base'].update({
                                 "non_linearity": "gelu_new",
 
                                 #Compacter.
-                                "hypercomplex_division": 4, 
+                                "hypercomplex_division": 4,
                                 "hypercomplex_adapters": True,
                                 "hypercomplex_nonlinearity": "glorot-uniform",
-                                # gradient clip and clamp 
+                                # gradient clip and clamp
                                 "gradient_clip": False,
                                 "phm_clamp": False,
-                                "normalize_phm_weight": False, 
+                                "normalize_phm_weight": False,
                                 "learn_phm": True,
-                                # shared one side 
-                                "factorized_phm": True, 
+                                # shared one side
+                                "factorized_phm": True,
                                 "shared_phm_rule": False,
                                 "factorized_phm_rule": False,
                                 "phm_c_init": "normal",
@@ -252,7 +252,7 @@ AllConfigs['low_rank_adapter_t5-base'].update({
                                 ],
                                 "output_dir": "outputs/low_rank_adapter/t5-base/",
                                 "non_linearity": "gelu_new",
-                                "low_rank_w_init": "glorot-uniform", 
+                                "low_rank_w_init": "glorot-uniform",
                                 "low_rank_rank": 1,
                             })
 
@@ -288,8 +288,8 @@ AllConfigs['none_t5-base'].update({
 
 AllConfigs['bitfit_t5-large'] = copy.deepcopy(BaseConfigs['t5-large'])
 AllConfigs['bitfit_t5-large'].update({
-                "delta_type": "bitfit",      
-                "learning_rate": 3e-4,         
+                "delta_type": "bitfit",
+                "learning_rate": 3e-4,
                 "output_dir": "outputs/bitfit/t5-large/",
             })
 
@@ -303,8 +303,8 @@ AllConfigs['none_t5-large'].update({
 
 AllConfigs['bitfit_t5-3b'] = copy.deepcopy(BaseConfigs['t5-3b'])
 AllConfigs['bitfit_t5-3b'].update({
-                "delta_type": "bitfit",      
-                "learning_rate": 3e-4,         
+                "delta_type": "bitfit",
+                "learning_rate": 3e-4,
                 "output_dir": "outputs/bitfit/t5-3b/",
             })
 
@@ -367,7 +367,7 @@ AllConfigs['lora_t5-3b'].update({
                                 "output_dir": "outputs/lora/t5-3b/",
                             })
 
-                            
+
 if __name__ == "__main__":
     import argparse
     import json
@@ -405,7 +405,6 @@ if __name__ == "__main__":
     for job_name in all_config_jsons:
         with open(f"./{args.job}_{BS}/{job_name}.json", 'w') as fout:
             json.dump(all_config_jsons[job_name], fout, indent=4,sort_keys=True)
-        
-    
 
-    
+
+

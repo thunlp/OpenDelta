@@ -197,7 +197,7 @@ class DataTrainingArguments:
     datasets_saved_path: Optional[str] = field(
         default=None, metadata={"help": "the path of the saved datasets"}
     )
-    data_seed: Optional[int] = field(default=42, metadata={"help": "seed used to shuffle the data."})
+    data_sample_seed: Optional[int] = field(default=42, metadata={"help": "seed used to shuffle the data."})
 
 
     model_parallel: Optional[bool] = field(default=False, metadata={"help": "whether apply model parallelization"})
