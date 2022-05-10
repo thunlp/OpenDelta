@@ -1,4 +1,3 @@
-from examples_prompt.metrics.metrics import exact_match
 from opendelta.utils.signature import get_arg_names, get_arg_names_inside_func
 from opendelta.utils.name_based_addressing import *
 from opendelta.utils.cuda import get_device
@@ -7,8 +6,6 @@ from typing import *
 import torch
 import torch.nn as nn
 from opendelta import BaseDeltaConfig
-from decorator import decorate
-import torch.nn.functional as F
 from opendelta import logging
 logger = logging.get_logger(__name__)
 

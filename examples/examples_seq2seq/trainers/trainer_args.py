@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Optional, List
-from transformers import Seq2SeqTrainingArguments 
+from transformers import Seq2SeqTrainingArguments
 # run_seq2seq parameters.
 
 @dataclass
@@ -127,8 +127,9 @@ class DataTrainingArguments:
         default=None,
         metadata={"help": "Defines a dictionary from tasks to the tasks embeddings."}
     )
-    data_seed: Optional[int] = field(default=42, metadata={"help": "seed used to shuffle the data."})
-    
+    data_sample_seed: Optional[int] = field(default=42, metadata={"help": "seed used to shuffle the data."})
+
+
     model_parallel: Optional[bool] = field(default=False, metadata={"help": "whether apply model parallelization"})
 
     def __post_init__(self):

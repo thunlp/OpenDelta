@@ -19,9 +19,9 @@ Fine-tuning the library models for sequence to sequence.
 import functools
 import logging
 # from opendelta.utils.delta_center import create_hub_repo_name
-import torch 
+import torch
 import os
-os.environ['MKL_THREADING_LAYER'] = 'GNU' 
+os.environ['MKL_THREADING_LAYER'] = 'GNU'
 os.environ['MKL_SERVICE_FORCE_INTEL'] = '1'
 import sys
 import subprocess
@@ -43,14 +43,14 @@ from transformers.trainer_utils import is_main_process, get_last_checkpoint
 from examples_seq2seq.data_processors import AutoTask, TaskDataCollatorForSeq2Seq, AutoPostProcessor
 from examples_seq2seq.seq2seq_trainer import Seq2SeqTrainer
 # from training_args import AdapterTrainingArguments
-from examples_seq2seq.trainers.trainer_utils import save_training_config 
+from examples_seq2seq.trainers.trainer_utils import save_training_config
 from dataclasses import dataclass, field
 
 from transformers.models.t5.modeling_t5 import T5Config, T5ForConditionalGeneration
 from examples_seq2seq.trainers.model_args import ModelArguments
 from examples_seq2seq.trainers.trainer_args import TrainingArguments, DataTrainingArguments
 
-import tensorboardX 
+import tensorboardX
 tb_writer = tensorboardX.SummaryWriter("Delta_Memory")
 
 logger = logging.getLogger(__name__)
@@ -100,7 +100,7 @@ class RemainArgHfArgumentParser(HfArgumentParser):
             inputs = {k: data.pop(k) for k in list(data.keys()) if k in keys}
             obj = dtype(**inputs)
             outputs.append(obj)
-        
+
         remain_args = argparse.ArgumentParser()
         remain_args.__dict__.update(data)
         if return_remaining_args:
@@ -108,41 +108,41 @@ class RemainArgHfArgumentParser(HfArgumentParser):
         else:
             return (*outputs,)
 
-from transformers.trainer_callback import TrainerCallback
+# from transformers.trainer_callback import TrainerCallback
 
-class MyCallback(TrainerCallback):
-    def __init__(self, *args, **kwargs):
-        self.delta_args = kwargs.pop("delta_args")
-        self.trainer_args = kwargs.pop("trainer_args")
-        self.model_args = kwargs.pop("model_args")
-        super(MyCallback, self).__init__(*args, **kwargs)
-        
-    
-    maxcudamem = 0
-    def on_step_end(self, args, state, control, **kwargs ):
-        glb_step = state.global_step
-        cudamem = 0
-        realcudamem =0
-        for device_id in range(torch.cuda.device_count()):
-            cudamem += torch.cuda.memory_allocated(f"cuda:{device_id}")/1024**3
-            realcudamem += torch.cuda.max_memory_allocated(f"cuda:{device_id}")/1024**3
-            torch.cuda.reset_peak_memory_stats(f"cuda:{device_id}")
-        self.maxcudamem = max(self.maxcudamem, realcudamem)
-        self.cudamem = cudamem
-        # self.tb_writer.add_scalar("Static Memory (GB)", cudamem, glb_step)
+# class MyCallback(TrainerCallback):
+#     def __init__(self, *args, **kwargs):
+#         self.delta_args = kwargs.pop("delta_args")
+#         self.trainer_args = kwargs.pop("trainer_args")
+#         self.model_args = kwargs.pop("model_args")
+#         super(MyCallback, self).__init__(*args, **kwargs)
+
+
+#     maxcudamem = 0
+#     def on_step_end(self, args, state, control, **kwargs ):
+#         glb_step = state.global_step
+#         cudamem = 0
+#         realcudamem =0
+#         for device_id in range(torch.cuda.device_count()):
+#             cudamem += torch.cuda.memory_allocated(f"cuda:{device_id}")/1024**3
+#             realcudamem += torch.cuda.max_memory_allocated(f"cuda:{device_id}")/1024**3
+#             torch.cuda.reset_peak_memory_stats(f"cuda:{device_id}")
+#         self.maxcudamem = max(self.maxcudamem, realcudamem)
+#         self.cudamem = cudamem
+#         # self.tb_writer.add_scalar("Static Memory (GB)", cudamem, glb_step)
         # self.tb_writer.add_scalar("Runtime Memory (GB)", realcudamem, glb_step)
         # self.tb_writer.add_scalar("Peak Memory (GB)", self.maxcudamem, glb_step)
-        if glb_step > 50:
-            content = f"{self.delta_args.delta_type}\t{self.trainer_args.per_device_train_batch_size}\t{self.model_args.model_name_or_path}\t{self.cudamem}\t{self.maxcudamem}\n"
-            with open("memory_data.txt", 'a') as fout:
-                fout.write(content)
-            exit()
-
-            
+        # if glb_step > 50:
+        #     content = f"{self.delta_args.delta_type}\t{self.trainer_args.per_device_train_batch_size}\t{self.model_args.model_name_or_path}\t{self.cudamem}\t{self.maxcudamem}\n"
+        #     with open("memory_data.txt", 'a') as fout:
+        #         fout.write(content)
+        #     exit()
 
 
-        
-    
+
+
+
+
 
 
 
@@ -172,7 +172,7 @@ def main():
                 "Use --overwrite_output_dir to overcome."
             )
             '''
-            pass 
+            pass
         elif last_checkpoint is not None:
             logger.info(
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
@@ -273,7 +273,7 @@ def main():
     # Temporarily set max_target_length for training.
     #max_target_length = data_args.max_target_length
     padding = "max_length" if data_args.pad_to_max_length else False
-    
+
     def preprocess_function(examples, max_target_length):
         # max_target_length += 1
         # model_inputs = tokenizer([s+"<extra_id_0>" for s in examples['source']], max_length=data_args.max_source_length,
@@ -301,7 +301,7 @@ def main():
     if training_args.do_train:
         train_datasets = [AutoTask.get(dataset_name,
                                        dataset_config_name,
-                                       seed=data_args.data_seed).get(
+                                       seed=data_args.data_sample_seed).get(
             split="train",
             split_validation_test=training_args.split_validation_test,
             add_prefix=True,
@@ -320,11 +320,11 @@ def main():
                 load_from_cache_file=not data_args.overwrite_cache,
             )
         train_dataset = concatenate_datasets(train_datasets)
-   
+
     if training_args.do_eval:
         eval_datasets = {eval_dataset: AutoTask.get(eval_dataset, eval_dataset_config,
-            seed=data_args.data_seed).get(
-            split="validation", 
+            seed=data_args.data_sample_seed).get(
+            split="validation",
             split_validation_test=training_args.split_validation_test,
             add_prefix=True,
             n_obs=data_args.max_val_samples)
@@ -343,8 +343,8 @@ def main():
 
     if training_args.do_test:
         test_datasets = {test_dataset: AutoTask.get(test_dataset, test_dataset_config,
-            seed=data_args.data_seed).get(
-            split="test", 
+            seed=data_args.data_sample_seed).get(
+            split="test",
             split_validation_test=training_args.split_validation_test,
             add_prefix=True,
             n_obs=data_args.max_test_samples)
@@ -379,10 +379,10 @@ def main():
 
     # Extracts the extra information needed to evaluate on each dataset.
     # These information are only used in the compute_metrics.
-    # We will assume that the test/eval dataloader does not change the order of 
+    # We will assume that the test/eval dataloader does not change the order of
     # the data.
     data_info = {"eval": eval_datasets[data_args.eval_dataset_name[0]]['extra_fields'],
-                 "test": test_datasets[data_args.test_dataset_name[0]]['extra_fields'], 
+                 "test": test_datasets[data_args.test_dataset_name[0]]['extra_fields'],
                  "train": train_dataset['extra_fields']}
     def compute_metrics(eval_preds):
         preds, labels, data_info = eval_preds
@@ -409,10 +409,10 @@ def main():
         evaluation_metrics = TASK_TO_METRICS[data_args.dataset_name[0]],
     )
 
-    trainer.add_callback(MyCallback(trainer_args=training_args, delta_args=delta_args, model_args=model_args))
+    # trainer.add_callback(MyCallback(trainer_args=training_args, delta_args=delta_args, model_args=model_args))
 
 
-    # Saves training config. 
+    # Saves training config.
     if trainer.is_world_process_zero():
        os.makedirs(training_args.output_dir, exist_ok=True)
        save_training_config(sys.argv[1], training_args.output_dir)
@@ -430,15 +430,15 @@ def main():
             start = torch.cuda.Event(enable_timing=True)
             end = torch.cuda.Event(enable_timing=True)
             start.record()
-        
+
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
-        
+
         if training_args.compute_time:
             end.record()
             torch.cuda.synchronize()  # wait for all_reduce to complete
             total_time = start.elapsed_time(end)/(1000*60)
             performance_metrics.update({"total_time in minutes ": total_time})
-        
+
         trainer.save_model()  # Saves the tokenizer too for easy upload
         train_metrics = train_result.metrics
         max_train_samples = (
@@ -460,7 +460,7 @@ def main():
     if training_args.compute_memory or training_args.compute_time:
         print(performance_metrics)
         trainer.save_metrics("performance", performance_metrics)
-    
+
     # Evaluation
     results = {}
     if training_args.do_eval:
@@ -484,9 +484,9 @@ def main():
             trainer.log_metrics("test", metrics)
             trainer.save_metrics("test", metrics)
         results['test'] = metrics
-    
+
     repo_name = create_hub_repo_name(root="DeltaHub",
-                         dataset=data_args.task_name, 
+                         dataset=data_args.task_name,
                          delta_type = delta_args.delta_type,
                          model_name_or_path= model_args.model_name_or_path)
     results['repo_name'] = repo_name

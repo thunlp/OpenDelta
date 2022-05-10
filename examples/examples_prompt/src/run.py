@@ -124,6 +124,9 @@ def main():
     if os.path.basename(model_args.model_name_or_path).startswith("t5"):
         from examples_prompt.backbones.t5 import get_backbone, preprocess_function, mask_token_func, get_remove_columns, get_prompts
         from examples_prompt.backbones.t5 import Trainer, DataCollator
+    elif  os.path.basename(model_args.model_name_or_path).startswith("blenderbot"):
+        from examples_prompt.backbones.blenderbot import get_backbone, preprocess_function, mask_token_func, get_remove_columns, get_prompts
+        from examples_prompt.backbones.blenderbot import Trainer, DataCollator
     elif os.path.basename(model_args.model_name_or_path).startswith("roberta") \
         or os.path.basename(model_args.model_name_or_path).startswith("bert") \
           or os.path.basename(model_args.model_name_or_path).startswith("albert") :
@@ -132,12 +135,24 @@ def main():
     elif os.path.basename(model_args.model_name_or_path).startswith("beit"):
         from examples_prompt.backbones.beit import get_backbone, preprocess_function, mask_token_func, get_remove_columns, get_prompts
         from examples_prompt.backbones.beit import Trainer, DataCollator
+    elif os.path.basename(model_args.model_name_or_path).startswith("bart"):
+        from examples_prompt.backbones.bart import get_backbone, preprocess_function, mask_token_func, get_remove_columns, get_prompts
+        from examples_prompt.backbones.bart import Trainer, DataCollator
+    elif os.path.basename(model_args.model_name_or_path).startswith("bigbird"):
+        from examples_prompt.backbones.bigbird import get_backbone, preprocess_function, mask_token_func, get_remove_columns, get_prompts
+        from examples_prompt.backbones.bigbird import Trainer, DataCollator
+    elif os.path.basename(model_args.model_name_or_path).startswith("clip"):
+        from examples_prompt.backbones.clip import get_backbone, preprocess_function, mask_token_func, get_remove_columns, get_prompts
+        from examples_prompt.backbones.clip import Trainer, DataCollator
 
 
 
 
 
     config, tokenizer, model = get_backbone(model_args=model_args)
+
+    from opendelta import Visualization
+    Visualization(model).structure_graph()
 
     if delta_args.delta_type.lower() != "none":
         from opendelta import AutoDeltaConfig,AutoDeltaModel
@@ -174,7 +189,7 @@ def main():
         task = AutoTask.get(data_args.task_name,
                             data_args.dataset_config_name,
                             data_args=data_args,
-                            seed=data_args.data_seed)
+                            seed=data_args.data_sample_seed)
 
         dataset =  task.get(split=split_name,
                             split_validation_test=training_args.split_validation_test,
@@ -182,7 +197,7 @@ def main():
 
 
 
-        template, _verbalizer, tokenizer_wrapper = get_prompts(task, tokenizer, training_args)
+        template, _verbalizer, tokenizer_wrapper = get_prompts(task, tokenizer, data_args)
 
 
         dataset = dataset.map(

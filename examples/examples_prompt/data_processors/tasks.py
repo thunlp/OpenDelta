@@ -85,11 +85,14 @@ class SST2(AbstractTask):
                            "test": "validation"}
 
     verbalizers = {
-        "0":{"0":"negative","1":"positive"}
+        "0":{"0":"negative","1":"positive"},
+        "blenderbot":{"0":"negative","1":"positive"}
+
     }
 
     templates_text = {
-        "0":"""The sentiment of sentence: "{"meta":"sentence", "shortenable":True} is {"mask"}."""
+        "0":"""The sentiment of sentence: "{"meta":"sentence", "shortenable":True}" is {"mask"}.""",
+        "blenderbot": """{"meta":"sentence", "shortenable":True} what is the sentiment?"""
     }
 
     def load_dataset(self, split):
@@ -533,14 +536,15 @@ class Beans(AbstractTask):
     metric_names = ["accuracy"]
 
     verbalizers = {
-        "0": {
-        "0": "No",
-        "1": "Yes",
+        "clip": {
+        "angular_leaf_spot": "angular_leaf_spot",
+        "bean_rust": "bean_rust",
+        "healthy": "healthy",
         }
     }
 
     templates_text = {
-        "0": """{"meta":"sentence1"}"""
+        "clip":"""a photo of {"mask"} leaf."""
     }
 
     def load_dataset(self, split):
