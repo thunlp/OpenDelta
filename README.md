@@ -3,7 +3,7 @@
 
 <img src="https://s4.ax1x.com/2022/02/14/Hy7lAf.png" width="350px">
 
-**An Open-Source Framework for Paramter-Efficient Tuning (Delta Tuning).**
+**An Open-Source Framework for Paramter Efficient Tuning (Delta Tuning).**
 
 ------
 
