@@ -7,7 +7,7 @@ def get_requirements(path):
     print("path is :", path)
     ret = []
 
-    with open(os.path.join("/mnt/sfs_turbo/hsd/opendelta1.0.0_beta/OpenDelta/requirements.txt"), encoding="utf-8") as freq:
+    with open(os.path.join(path, "requirements.txt"), encoding="utf-8") as freq:
         for line in freq.readlines():
             ret.append( line.strip() )
     return ret
