@@ -2,7 +2,7 @@ import collections
 import copy
 
 PATHBASE="/mnt/sfs_turbo/hsd/plm_cache/"
-PATHBASE="/home/hushengding/plm_cache/"
+# PATHBASE="/home/hushengding/plm_cache/"
 
 AllConfigs = {}
 
@@ -51,7 +51,9 @@ BaseConfigs['bert-base-cased'] = {
                 "overwrite_output_dir": True,
                 "push_to_hub": False,
                 "push_to_delta_center": True,
-                "save_strategy": "steps"
+                "save_strategy": "steps",
+                "datasets_load_from_disk": True,
+                "datasets_saved_path": "/mnt/sfs_turbo/hsd/huggingface_datasets/saved_to_disk/"
             }
 
 AllConfigs['prefix_bert-base-cased'] = copy.deepcopy(BaseConfigs['bert-base-cased'])
@@ -73,6 +75,13 @@ AllConfigs['soft_prompt_bert-base-cased'].update({
                                 ],
                                 "output_dir": "outputs/soft_prompt/bert-base-cased/",
                             })
+
+AllConfigs['prefix_bert-large-cased'] = copy.deepcopy(AllConfigs['prefix_bert-base-cased'])
+AllConfigs['prefix_bert-large-cased'].update({
+    "output_dir": "outputs/prefix/bert-large-cased/",
+    "model_name_or_path": f"{PATHBASE}bert-large-cased",
+    "tokenizer_name": f"{PATHBASE}bert-large-cased",
+})
 
 if __name__ == "__main__":
     import argparse

@@ -2,7 +2,7 @@ import collections
 import copy
 
 PATHBASE="/mnt/sfs_turbo/hsd/plm_cache/"
-PATHBASE="/home/hushengding/plm_cache/"
+# PATHBASE="/home/hushengding/plm_cache/"
 
 AllConfigs = {}
 
@@ -47,7 +47,9 @@ BaseConfigs['t5-base'] = {
                 "overwrite_output_dir": True,
                 "push_to_hub": False,
                 "push_to_delta_center": True,
-                "save_strategy": "steps"
+                "save_strategy": "steps",
+                "datasets_load_from_disk": True,
+                "datasets_saved_path": "/mnt/sfs_turbo/hsd/huggingface_datasets/saved_to_disk/"
             }
 
 AllConfigs['bitfit_t5-base'] = copy.deepcopy(BaseConfigs['t5-base'])

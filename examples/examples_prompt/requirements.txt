@@ -1,2 +1,4 @@
 optuna
 sklearn
+openpromptu
+tensorboard

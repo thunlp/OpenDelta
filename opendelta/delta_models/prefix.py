@@ -4,7 +4,7 @@ from opendelta.utils.signature import get_arg_names_inside_func, signature
 from typing import Optional, Union
 from transformers.models.distilbert.modeling_distilbert import MultiHeadSelfAttention
 from transformers.models.t5.modeling_t5 import T5Attention, T5LayerSelfAttention
-from transformers.models.bert.modeling_bert import BertSelfAttention
+from transformers.models.bert.modeling_bert import BertAttention
 from transformers.models.gpt2.modeling_gpt2 import GPT2Attention
 from transformers.models.bart.modeling_bart import BartAttention
 from transformers.models.roberta.modeling_roberta import RobertaAttention
@@ -12,7 +12,6 @@ from opendelta.utils.name_based_addressing import *
 from opendelta.utils.cuda import get_device
 from opendelta.basemodel import DeltaBase
 from transformers.models.t5 import T5ForConditionalGeneration
-import loralib as lora
 import torch.nn as nn
 import torch
 import opendelta.utils.logging as logging
@@ -264,6 +263,64 @@ class PrefixLayerDistilBert(nn.Module):
             past_value = self.past_value_reparam
         output = torch.cat([past_value.unsqueeze(0).expand(batch_size, *past_value.shape), hiddens], dim=1)
         return output
+
+
+class PrefixLayerBert(nn.Module):
+    r"""A layer of prefix tuning module. The layer's forward function pass (or concatenate) the additional past_key_value
+    into the original attention layer's forward function.
+    """
+    def __init__(self, prefix_token_num, num_heads, device,):
+        super().__init__()
+        self.prefix_token_num = prefix_token_num
+        self.num_heads = num_heads
+        self.device = device
+        self.instantiated = False
+
+    def instantiate(self, hidden_dim):
+        self.past_key = nn.Parameter(torch.randn(self.prefix_token_num, hidden_dim, device=self.device), requires_grad=True)
+        self.past_value = nn.Parameter(torch.randn(self.prefix_token_num, hidden_dim, device=self.device), requires_grad=True)
+        self.past_key_reparam = None
+        self.past_value_reparam = None
+        self.instantiated = True
+
+
+    def pre_forward(self, *args, **kwargs):
+        r"""The args and kwargs are inherited from the T5Attention's forward function.
+        """
+        batch_size = args[0].shape[0]
+        if not self.instantiated:
+            self.hidden_dim = args[0].shape[-1]
+            self.instantiate(hidden_dim=self.hidden_dim)
+        if self.past_key_reparam is None:
+            past_key = self.past_key.data
+        else:
+            past_key = self.past_key_reparam
+        if self.past_value_reparam is None:
+            past_value = self.past_value.data
+        else:
+            past_value = self.past_value_reparam
+
+
+        def expand_batchsize(x):
+            x = x.reshape(self.prefix_token_num, self.num_heads, -1).transpose(0,1)
+            x = x.unsqueeze(0).expand(batch_size, *x.shape)
+            return x
+        # from IPython import embe
+
+        if 'past_key_value' not in kwargs or kwargs['past_key_value'] is None:
+            kwargs['past_key_value'] = (expand_batchsize(past_key), expand_batchsize(past_value))
+
+        if 'attention_mask' in kwargs and kwargs['attention_mask'] is not None:
+            am = kwargs['attention_mask']  # Should check the format of the attention_mask when moving to a new plm.
+            kwargs['attention_mask'] = torch.cat([-torch.zeros((*am.shape[:-1],self.prefix_token_num), dtype = am.dtype,device=am.device), am], dim=-1)
+        elif len(args) >1: # attention mask is passed via positional argument
+            am = args[1]
+            am = torch.cat([-torch.zeros((*am.shape[:-1],self.prefix_token_num), dtype = am.dtype,device=am.device), am], dim=-1)
+            args = (args[0], am) + args[2:]
+        # from IPython import embed
+        # embed(header = "Herein prefixroberta")
+        return args, kwargs
+
 
 
 class PrefixLayerRoberta(nn.Module):
@@ -540,8 +597,9 @@ class PrefixModel(DeltaBase):
             prefixlayer = PrefixLayerDistilBert(prefix_token_num=self.prefix_token_num, device=module_device)
             self.insert_sequential_module(getattr(module, "k_lin"), pre_caller=prefixlayer.key_pre_forward, post_caller=prefixlayer.key_forward)
             self.insert_sequential_module(getattr(module, "v_lin"), pre_caller=prefixlayer.value_pre_forward, post_caller=prefixlayer.value_forward)
-        elif isinstance(module, BertSelfAttention):
-            raise NotImplementedError
+        elif isinstance(module, BertAttention):
+            module_device = get_device(module)
+            prefixlayer = PrefixLayerBert(prefix_token_num=self.prefix_token_num, num_heads=module.self.num_attention_heads ,device=module_device)
         elif isinstance(module, RobertaAttention):
             module_device = get_device(module)
             prefixlayer = PrefixLayerRoberta(prefix_token_num=self.prefix_token_num, num_heads=module.self.num_attention_heads,device=module_device)

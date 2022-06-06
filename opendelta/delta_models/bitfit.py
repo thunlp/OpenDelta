@@ -2,15 +2,11 @@ from typing import Optional, Union
 from opendelta.utils.signature import get_arg_names_inside_func
 from opendelta.utils.name_based_addressing import *
 from opendelta.basemodel import DeltaBase, is_leaf_module
-from transformers.models.t5 import T5ForConditionalGeneration
-import loralib as lora
 import torch.nn as nn
 
-from transformers.models.bert.modeling_bert import BertForMaskedLM
 import torch
 from torch.nn import init
 import math
-from opendelta.utils.structure_mapping import transform
 from opendelta import BaseDeltaConfig
 import opendelta.utils.logging as logging
 logger = logging.get_logger(__name__)
