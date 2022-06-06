@@ -46,11 +46,11 @@ class PrefixLayerT5(nn.Module):
             self.hidden_dim = args[0].shape[-1]
             self.instantiate(hidden_dim=self.hidden_dim)
         if self.past_key_reparam is None:
-            past_key = self.past_key.data
+            past_key = self.past_key
         else:
             past_key = self.past_key_reparam
         if self.past_value_reparam is None:
-            past_value = self.past_value.data
+            past_value = self.past_value
         else:
             past_value = self.past_value_reparam
 
@@ -110,11 +110,11 @@ class PrefixLayerBart(nn.Module):
             self.hidden_dim = kwargs['hidden_states'].shape[-1]
             self.instantiate(hidden_dim=self.hidden_dim)
         if self.past_key_reparam is None:
-            past_key = self.past_key.data
+            past_key = self.past_key
         else:
             past_key = self.past_key_reparam
         if self.past_value_reparam is None:
-            past_value = self.past_value.data
+            past_value = self.past_value
         else:
             past_value = self.past_value_reparam
 
@@ -162,11 +162,11 @@ class PrefixLayerGPT2(nn.Module):
             self.hidden_dim = args[0].shape[-1]
             self.instantiate(hidden_dim=self.hidden_dim)
         if self.past_key_reparam is None:
-            past_key = self.past_key.data
+            past_key = self.past_key
         else:
             past_key = self.past_key_reparam
         if self.past_value_reparam is None:
-            past_value = self.past_value.data
+            past_value = self.past_value
         else:
             past_value = self.past_value_reparam
 
@@ -241,7 +241,7 @@ class PrefixLayerDistilBert(nn.Module):
             self.key_instantiate(hidden_dim=self.hidden_dim)
         batch_size = hiddens.shape[0]
         if self.past_key_reparam is None:
-            past_key = self.past_key.data
+            past_key = self.past_key
         else:
             past_key = self.past_key_reparam
         output = torch.cat([past_key.unsqueeze(0).expand(batch_size, *past_key.shape), hiddens], dim=1)
@@ -258,7 +258,7 @@ class PrefixLayerDistilBert(nn.Module):
             self.value_instantiate(hidden_dim=self.hidden_dim)
         batch_size = hiddens.shape[0]
         if self.past_value_reparam is None:
-            past_value = self.past_value.data
+            past_value = self.past_value
         else:
             past_value = self.past_value_reparam
         output = torch.cat([past_value.unsqueeze(0).expand(batch_size, *past_value.shape), hiddens], dim=1)
@@ -292,11 +292,11 @@ class PrefixLayerBert(nn.Module):
             self.hidden_dim = args[0].shape[-1]
             self.instantiate(hidden_dim=self.hidden_dim)
         if self.past_key_reparam is None:
-            past_key = self.past_key.data
+            past_key = self.past_key
         else:
             past_key = self.past_key_reparam
         if self.past_value_reparam is None:
-            past_value = self.past_value.data
+            past_value = self.past_value
         else:
             past_value = self.past_value_reparam
 
@@ -350,11 +350,11 @@ class PrefixLayerRoberta(nn.Module):
             self.hidden_dim = args[0].shape[-1]
             self.instantiate(hidden_dim=self.hidden_dim)
         if self.past_key_reparam is None:
-            past_key = self.past_key.data
+            past_key = self.past_key
         else:
             past_key = self.past_key_reparam
         if self.past_value_reparam is None:
-            past_value = self.past_value.data
+            past_value = self.past_value
         else:
             past_value = self.past_value_reparam
 

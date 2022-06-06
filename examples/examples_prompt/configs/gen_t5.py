@@ -187,6 +187,7 @@ AllConfigs['prefix_t5-base'].update({
                                 "unfrozen_modules": [
                                     "deltas",
                                 ],
+                                "reparameterize": False,
                                 "output_dir": "outputs/prefix/t5-base/",
                             })
 

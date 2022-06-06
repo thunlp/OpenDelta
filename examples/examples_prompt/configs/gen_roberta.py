@@ -2,7 +2,7 @@ import collections
 import copy
 
 PATHBASE="/mnt/sfs_turbo/hsd/plm_cache/"
-PATHBASE="/home/hushengding/plm_cache/"
+# PATHBASE="/home/hushengding/plm_cache/"
 
 AllConfigs = {}
 
@@ -49,7 +49,9 @@ BaseConfigs['roberta-base'] = {
                 "evaluation_strategy": "steps",
                 "overwrite_output_dir": True,
                 "push_to_hub": True,
-                "save_strategy": "steps"
+                "save_strategy": "steps",
+                "datasets_load_from_disk": True,
+                "datasets_saved_path": "/mnt/sfs_turbo/hsd/huggingface_datasets/saved_to_disk/"
             }
 
 
@@ -100,6 +102,24 @@ AllConfigs['soft_prompt_roberta-base'].update({
                                 ],
                                 "output_dir": "outputs/soft_prompt/roberta-base/",
                             })
+
+AllConfigs['prefix_roberta-base'] = copy.deepcopy(BaseConfigs['roberta-base'])
+AllConfigs['prefix_roberta-base'].update({
+                                "delta_type": "prefix",
+                                "learning_rate": 3e-4,
+                                "unfrozen_modules": [
+                                    "deltas",
+                                ],
+                                "output_dir": "outputs/prefix/roberta-base/",
+                            })
+
+
+AllConfigs['prefix_roberta-large'] = copy.deepcopy(AllConfigs['prefix_roberta-base'])
+AllConfigs['prefix_roberta-large'].update({
+    "output_dir": "outputs/prefix/prefix_roberta-large",
+    "model_name_or_path": f"{PATHBASE}prefix_roberta-large",
+    "tokenizer_name": f"{PATHBASE}prefix_roberta-large",
+})
 
 if __name__ == "__main__":
     import argparse
