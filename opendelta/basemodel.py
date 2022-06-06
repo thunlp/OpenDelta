@@ -22,6 +22,8 @@ from opendelta import logging
 from opendelta.utils.structure_mapping import CommonStructureMap
 from opendelta.utils.interactive.web import interactive
 from opendelta.utils.data_parallel import new_replicate_for_data_parallel
+from opendelta.utils.cuda import move_dict_to_cuda
+
 logger = logging.get_logger(__name__)
 
 def is_leaf_module(module):
@@ -109,6 +111,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
                 else:
                     self.modified_modules = interactive(backbone_model, port=interactive_modify)
                 self.common_structure = False
+                self.exclude_modules = self.default_exclude_modules
             else:
                 self.modified_modules = self.default_modified_modules
                 self.common_structure = True
@@ -328,11 +331,12 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         """
         if module is None:
             module = self.backbone_model
+        device = get_device(module)
         try:
             dummy_inputs = module.dummy_inputs
+            dummy_inputs = move_dict_to_cuda(dummy_inputs, device)
             module(**dummy_inputs)
         except AttributeError:
-            device = get_device(module)
             logger.warning("No dummy_inputs attributes, create a common input_ids for input.")
             pseudo_input = torch.tensor([[0,0]]).to(device)
             if "decoder_input_ids" in  signature(module.forward).args:

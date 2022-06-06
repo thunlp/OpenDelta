@@ -151,6 +151,11 @@ def main():
 
     config, tokenizer, model = get_backbone(model_args=model_args)
 
+    # model parallelize
+    if hasattr(training_args, "model_parallel") and training_args.model_parallel:
+        logger.info('parallelize model!')
+        model.parallelize()
+
     from opendelta import Visualization
     Visualization(model).structure_graph()
 
@@ -161,10 +166,7 @@ def main():
         delta_model.freeze_module(set_state_dict = True)
         delta_model.log(delta_ratio=True, trainable_ratio=True, visualization=True)
 
-    # model parallelize
-    if hasattr(training_args, "model_parallel") and training_args.model_parallel:
-        logger.info('parallelize model!')
-        model.parallelize()
+
 
 
 
