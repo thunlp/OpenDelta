@@ -70,9 +70,9 @@ def main():
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         # If we pass only one argument to the script and it's the path to a json file,
         # let's parse it to get our arguments.
-        model_args, data_args, training_args, delta_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+        model_args, data_args, training_args, delta_args, remain_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
-        model_args, data_args, training_args, delta_args = parser.parse_args_into_dataclasses(return_remaining_strings=True)
+        model_args, data_args, training_args, delta_args, remain_args = parser.parse_args_into_dataclasses(return_remaining_strings=True)
 
 
     print(f"{training_args.output_dir}/results.json")
@@ -313,17 +313,26 @@ def main():
         trainer.save_metrics(f"{data_args.task_name}_test", metrics)
         all_results['test'][data_args.task_name] = metrics
 
+    # from opendelta.utils.delta_hub import create_hub_repo_name
+    # from opendelta.utils.delta_center import create_delta_center_args, create_repo_name
+
     # repo_name = create_hub_repo_name(root="DeltaHub",
     #                      dataset=data_args.task_name,
     #                      delta_type = delta_args.delta_type,
     #                      model_name_or_path= model_args.model_name_or_path)
-    # results['repo_name'] = repo_name
-    # if delta_args.delta_type.lower() != "none":
-    #     if training_args.push_to_hub: # TODO add description here
-    #         delta_model.save_finetuned(push_to_hub=True, save_directory=repo_name, use_auth_token=True)
-    #         # trainer.push_to_hub(**kwargs)
-    #     else:
-    #         delta_model.save_finetuned(push_to_hub=False, save_directory=repo_name, use_auth_token=True)
+
+    # center_args =
+    # repo_name = create_repo_name(prefix="", center_args=center_args)
+    # all_results['repo_name'] = repo_name
+
+
+    delta_model.save_finetuned(push_to_hf=training_args.push_to_hf,
+                               push_to_dc=training_args.push_to_dc,
+                               center_args={},
+                               center_args_pool = {**vars(model_args), **vars(data_args), **vars(training_args), **vars(delta_args)},
+                               delay_push=True,
+                            )
+
 
 
     with open(f"{training_args.output_dir}/results.json", 'w') as fout:

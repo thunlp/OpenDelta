@@ -1,9 +1,10 @@
 
 from io import RawIOBase
+import re
 from tarfile import HeaderError
-from typing import Union, Optional, Callable
+from typing import Dict, List, Union, Optional, Callable
 from opendelta.delta_configs import BaseDeltaConfig
-from opendelta.utils.model_md5 import gen_model_hash
+from opendelta.utils.model_md5 import gen_model_hash, gen_parameter_hash
 import torch
 import os
 from opendelta import logging
@@ -18,8 +19,68 @@ from transformers.file_utils import (
     )
 from transformers.utils.dummy_pt_objects import PreTrainedModel
 import hashlib
+from DeltaCenter import OssClient
+import  yaml
+from dataclasses import dataclass, field, fields
+import datetime
 
 logger = logging.get_logger(__name__)
+
+
+alternative_names = {
+    "train_tasks":  ["train_tasks", "train_task", "task_name"],
+}
+
+
+@dataclass
+class DeltaCenterArguments:
+    """
+    The arguments that are used to distinguish between different delta models on the DeltaCenter
+    """
+    name: str = field(default="",
+                        metadata={"help": "The name of the delta model checkpoint"}
+    )
+    backbone_model: str = field(default="",
+                                metadata={"help": "The backbone model of the delta model"}
+    )
+    model_path_public: str = field(
+        default = None,
+        metadata={"help": "Publicly available path (url) to pretrained model or model identifier from huggingface.co/models"}
+    )
+    model_revision: str = field(
+        default="main",
+        metadata={"help": "The specific model version to use (can be a branch name, tag name or commit id)."},
+    )
+    delta_type: str = field(
+        default=None,
+        metadata={"help": "the type of type model, e.g., adapter, lora, etc."}
+    )
+    train_tasks: Optional[Union[List[str], str]]= field(
+        default=None,
+        metadata={"help": "the task(s） that the delta is trained on"}
+    )
+    checkpoint_size: Optional[float] = field(
+        default=None,
+        metadata={"help": "the size of the checkpoint, in MB"}
+    )
+    test_tasks: Optional[Union[List[str], str]] = field(
+        default=None,
+        metadata={"help": "the task(s) that the delta is tested on"}
+    )
+    test_performance: Optional[float] = field(
+        default=None,
+        metadata={"help": "the performance of the model on the test set"}
+    )
+    trainable_ratio: Optional[float] = field(
+        default=None,
+        metadata={"help": "the ratio of trainable parameters in the model"}
+    )
+    delta_ratio: Optional[float] = field(
+        default=None,
+        metadata={"help": "the ratio of delta parameters in the model"}
+    )
+
+
 
 class SaveLoadMixin(PushToHubMixin):
     def add_configs_when_saving(self,):
@@ -36,8 +97,12 @@ class SaveLoadMixin(PushToHubMixin):
         save_config: bool = True,
         state_dict: Optional[dict] = None,
         save_function: Callable = torch.save,
-        push_to_hub: bool = False,
-        **kwargs,
+        push_to_dc: bool = True,
+        center_args: Optional[Union[DeltaCenterArguments, dict]] = None,
+        center_args_pool: Optional[dict] = None,
+        center_value_only_tags: Optional[List] = None,
+        center_key_value_tags: Optional[Dict] = None,
+        delay_push: bool = False,
     ):
         r"""
         Save a model and its configuration file to a directory, so that it can be re-loaded using the
@@ -57,49 +122,38 @@ class SaveLoadMixin(PushToHubMixin):
             save_function (:obj:`Callable`):
                 The function to use to save the state dictionary. Useful on distributed training like TPUs when one
                 need to replace ``torch.save`` by another method.
-            push_to_hub (:obj:`bool`, *optional*, defaults to :obj:`False`):
-                Whether or not to push your model to the HuggingFace model hub after saving it.
-                
-                .. tip::
+            push_to_dc (:obj:`bool`, *optional*, defaults to :obj:`True`): Whether or not to push the model to the DeltaCenter.
+            center_args (:obj:`Union[DeltaCenterArguments, dict]`, *optional*, defaults to :obj:`None`): The arguments
+                that are used to distinguish between different delta models on the DeltaCenter. It has higher priority than the `center_args_pool`.
+                It will be used to group delta models.
+            center_args_pool (:obj:`dict`, *optional*, defaults to :obj:`None`): The arguments's pool for DeltaCenter
+                Together with center_args, they are are used to distinguish between different delta models on the DeltaCenter.
+                It will be used to group delta models.
+            center_value_only_tags (:obj:`List`, *optional*, defaults to :obj:`None`): The tags in the form of list for the delta model, it is the
+                optional identifiers that are not expected by `DeltaCenterArgument`. It will not be used to group delta models in the delta center
+            center_key_value_tags (:obj:`Dict`, *optional*, defaults to :obj:`None`): The tags in the form of dictionary for the delta model, it is the
+                optional identifiers that are not expected by `DeltaCenterArgument`. It will not be used to group delta models in the delta center.
+            delay_push (:obj:`bool`, *optional*, defaults to :obj:`False`): Whether or not to delay the push to the DeltaCenter. When set to True,
+                the delta object will be saved locally to save_directory, you can push it later using
 
-                    Using ``push_to_hub=True`` will synchronize the repository you are pushing to with ``save_directory``,
-                    which requires ``save_directory`` to be a local clone of the repo you are pushing to if it's an existing
-                    folder. Pass along ``temp_dir=True`` to use a temporary directory instead.
-                
-            kwargs:
-                Additional key word arguments passed along to the :py:meth:`~file_utils.PushToHubMixin.push_to_hub` method.
+            .. code-block:: shell
 
-        .. note::
+                python -m DeltaCenter upload save_directory
 
-            You may need to install git-lfs on your machine. 
-        
-            .. code-block:: bash
-            
-                wget -P ~ https://github.com/git-lfs/git-lfs/releases/download/v3.0.2/git-lfs-linux-amd64-v3.0.2.tar.gz
-                cd ~
-                tar -xvzf git-lfs-linux-amd64-v3.0.2.tar.gz
-                export PATH=~:$PATH
-                git-lfs install
 
         """
         if os.path.isfile(save_directory):
             logger.error(f"Provided path ({save_directory}) should be a directory, not a file")
             return
 
-        if push_to_hub:
-            commit_message = kwargs.pop("commit_message", None)
-            repo = self._create_or_get_repo(save_directory, **kwargs)
-
         os.makedirs(save_directory, exist_ok=True)
 
-        # Only save the model itself if we are using distributed training
-    
         model_to_save = self.backbone_model# unwrap_model(self)
 
         # Save the model
         if state_dict is None:
             state_dict = model_to_save.state_dict()
-        
+
         # Save the config
         if save_config:
             if not hasattr(self, "config"):
@@ -107,31 +161,42 @@ class SaveLoadMixin(PushToHubMixin):
             self.add_configs_when_saving()
             self.config.save_finetuned(save_directory)
 
-        # If we save using the predefined names, we can load using `from_pretrained`
         output_model_file = os.path.join(save_directory, WEIGHTS_NAME)
         save_function(state_dict, output_model_file)
 
         logger.info(f"Model weights saved in {output_model_file}")
 
-        if push_to_hub:
-            url = self._push_to_hub(repo, commit_message=commit_message)
-            logger.info(f"Model pushed to the hub in this commit: {url}")
+        final_center_args = self.create_delta_center_args(center_args=center_args,
+                        center_args_pool=center_args_pool)
+
+        print("final_center_args", final_center_args)
+
+        if push_to_dc:
+            self.create_yml(save_directory, final_center_args, center_value_only_tags, center_key_value_tags)
+        if not delay_push:
+            OssClient.upload(base_dir=save_directory)
+
+
+    def create_yml(self, save_dir, config, list_tags=None, dict_tags=None):
+        f = open("{}/config.yml".format(save_dir), 'w')
+        yaml.safe_dump(vars(config), f)
+        f.close()
 
     @classmethod
-    def from_finetuned(cls, 
-                        finetuned_model_name_or_path: Optional[Union[str, os.PathLike]], 
-                        backbone_model: nn.Module,
+    def from_finetuned(cls,
+                       finetuned_model_name_or_path: Optional[Union[str, os.PathLike]],
+                       backbone_model: nn.Module,
                         *model_args,
                         check_hash: Optional[bool] = True,
                         **kwargs):
         r"""
         Instantiate a finetuned delta model from a path.
-        The backbone_model is set in evaluation mode by default using ``model.eval()`` (Dropout modules are deactivated). 
+        The backbone_model is set in evaluation mode by default using ``model.eval()`` (Dropout modules are deactivated).
         To further train the model, you can use the :meth:`freeze_module <opendelta.basemodel.DeltaBase.freeze_module>` method.
 
         Parameters:
 
-            finetuned_model_name_or_path (:obj:`str` or :obj:`os.PathLike`, *optional*): 
+            finetuned_model_name_or_path (:obj:`str` or :obj:`os.PathLike`, *optional*):
                 Can be either:
 
                 - A string, the *model id* of a pretrained model hosted inside a model repo on huggingface.co.
@@ -154,7 +219,7 @@ class SaveLoadMixin(PushToHubMixin):
             config (Union[:obj:`BaseDeltaConfig`, :obj:`str`, :obj:`os.PathLike`], *optional*): Can be either:
                 - an instance of a class derived from :class:`~PretrainedConfig`,
                 - a string or path valid as input to :py:meth:`~PretrainedConfig.from_pretrained`.
-                
+
                 Configuration for the model to use instead of an automatically loaded configuration. Configuration can
                 be automatically loaded when:
 
@@ -217,10 +282,10 @@ class SaveLoadMixin(PushToHubMixin):
                       corresponds to a configuration attribute will be used to override said attribute with the
                       supplied ``kwargs`` value. Remaining keys that do not correspond to any configuration attribute
                       will be passed to the underlying model's ``__init__`` function.
-        
+
         .. tip::
             Passing ``use_auth_token=True`` is required when you want to use a private model.
-        
+
         .. code-block:: python
 
             from transformers import AutoModelForSeq2SeqLM
@@ -228,14 +293,14 @@ class SaveLoadMixin(PushToHubMixin):
             from opendelta import AutoDeltaModel
             delta = AutoDeltaModel.from_finetuned("DeltaHub/lora_t5-base_mrpc", backbone_model=t5)
             delta.log()
-            
-        
-  
+
+
+
         """
         config = kwargs.pop("config", None)
         state_dict = kwargs.pop("state_dict", None)
         cache_dir = kwargs.pop("cache_dir", None)
-        
+
         # ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", False)
         force_download = kwargs.pop("force_download", False)
         resume_download = kwargs.pop("resume_download", False)
@@ -332,7 +397,7 @@ class SaveLoadMixin(PushToHubMixin):
             resolved_archive_file = None
 
         # load pt weights early so that we know which dtype to init the model under
-       
+
         if state_dict is None:
             try:
                 state_dict = torch.load(resolved_archive_file, map_location="cpu")
@@ -369,12 +434,12 @@ class SaveLoadMixin(PushToHubMixin):
                         f"`torch_dtype` can be either a `torch.dtype` or `auto`, but received {torch_dtype}"
                     )
             dtype_orig = cls._set_default_torch_dtype(torch_dtype)
-    
-  
-        # Initialize the model from config and attach the delta model to the backbone_model. 
+
+
+        # Initialize the model from config and attach the delta model to the backbone_model.
         delta_model = cls.from_config(config, backbone_model, *model_args, **model_kwargs, )
 
-        # load the state_dict into the backbone_model. As the delta model's parameter 
+        # load the state_dict into the backbone_model. As the delta model's parameter
         # is the same object as the deltas in the backbone model with different reference name,
         # the state_dict will also be loaded into the delta model.
         delta_model._load_state_dict_into_backbone(backbone_model, state_dict)
@@ -393,4 +458,75 @@ class SaveLoadMixin(PushToHubMixin):
         backbone_model.eval()
 
         return delta_model
-    
+
+
+    def create_delta_center_args(self, center_args, center_args_pool):
+        """
+        Create the delta center args for the center model.
+        center_args has higher priority than center_args_pool.
+
+        """
+        mdict = {}
+        field = fields(DeltaCenterArguments)
+
+        print("center_args_pool", center_args_pool)
+
+        for f in field:
+            exist = False
+            # first is center_args, exact match
+            if f.name in center_args:
+                mdict[f.name] = center_args[f.name]
+                continue
+            # second is center_args_pool, can use alternative names
+            if f.name in center_args_pool:
+                mdict[f.name] = center_args_pool[f.name]
+                exist = True
+            elif f.name in alternative_names:
+                for altername in alternative_names[f.name]:
+                    if altername in center_args_pool:
+                        mdict[f.name] = center_args_pool[altername]
+                        exist = True
+                        break
+            # if not exist, find from self.stat or set to default
+            if not exist:
+                if f.name in self.stat:
+                    mdict[f.name] = self.stat[f.name]
+                else:
+                    mdict[f.name] = f.default
+
+        # if eventualy name is not set, create a default one
+        if mdict['name'] is None or mdict['name'] == '':
+            print("Warning: name is not set, use default name")
+            mdict['name'] = self.create_default_name(**mdict)
+
+
+        center_args = DeltaCenterArguments(**mdict)
+        return  center_args
+
+    def create_default_name(self, **kwargs):
+        r"""Currently, it's only a simple concatenation of the arguments.
+        """
+        print("key args", kwargs)
+
+        reponame = ""
+        reponame += kwargs["model_path_public"].split("/")[-1]+"_" if kwargs['model_path_public'] is not None else kwargs['backbone_model']
+        reponame += kwargs["delta_type"]+"_" if kwargs["delta_type"] is not None else ""
+
+        # tasks
+        if isinstance(kwargs["train_tasks"], list):
+            train_tasks = "+".join(kwargs["train_tasks"])
+        elif kwargs["train_tasks"] is not None:
+            train_tasks = kwargs["train_tasks"]
+        else:
+            logger.warning("train_tasks are not find in all arguments. Do you miss them?")
+            train_tasks = None
+        reponame += train_tasks+"_" if train_tasks is not None else ""
+
+        # time
+        reponame += datetime.datetime.now().strftime("%Y%m%d%H%M%S") #+ gen_model_hash(model=self.backbone_model)
+
+        # model hash
+        if hasattr(self.config, "backbone_hash"):
+            reponame += self.config.backbone_hash[:3]
+        return reponame
+

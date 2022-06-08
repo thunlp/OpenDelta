@@ -12,10 +12,6 @@ import logging
 import numpy as np
 import torch
 import re
-from openprompt.prompts import ManualTemplate, ManualVerbalizer
-from openprompt.plms.utils import TokenizerWrapper
-from openprompt.data_utils import InputExample
-from openprompt.prompts import GenerationVerbalizer
 import itertools
 
 
@@ -27,7 +23,6 @@ from transformers.models.auto.tokenization_auto import tokenizer_class_from_name
 
 from typing import List, Dict
 from collections import defaultdict
-from openprompt.utils import round_list
 import warnings
 
 

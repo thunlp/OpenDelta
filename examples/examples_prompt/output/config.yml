@@ -1,0 +1,11 @@
+backbone_model: t5
+checkpoint_size: null
+delta_ratio: 0.008043610140382957
+delta_type: adapter
+model_path_public: t5-base
+model_revision: main
+name: t5-base_adapter_superglue-cb_20220607144623bc7
+test_performance: null
+test_tasks: null
+train_tasks: superglue-cb
+trainable_ratio: 0.008255508941616753

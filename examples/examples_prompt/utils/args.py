@@ -1,3 +1,4 @@
+from calendar import c
 from dataclasses import dataclass, field
 from typing import Optional, List
 from transformers import HfArgumentParser
@@ -81,6 +82,10 @@ class TrainingArguments(HfTrainingArguments):
     remove_unused_columns: Optional[bool] = field(
         default=False, metadata={"help": "Remove columns not required by the model when using an nlp.Dataset."}
     )
+    push_to_hf: Optional[bool] = field(default=False, metadata={"help": "Push the model to huggingface model hub."})
+    push_to_dc: Optional[bool] = field(default=True, metadata={"help": "Push the model to delta center."})
+
+
 
 
 
@@ -210,9 +215,42 @@ class DataTrainingArguments:
         if self.test_max_target_length is None:
             self.test_max_target_length = self.max_target_length
 
+@dataclass
+class DeltaArguments:
+    """
+    Arguments pertaining to what data we are going to input our model for training and eval.
+    """
+    delta_type: str= field(default="", metadata={"help": "the type of delta"})
+    backbone_model: Optional[str] = field(
+        default="", metadata={"help": "the backbone model"}
+    )
+    model_path_public: Optional[str] = field(
+        default="", metadata={"help": "the path (url) of the publicly available backbone model"}
+    )
+    modified_modules: Optional[List[str]] = field(
+        default_factory=lambda: None, metadata={"help": "the modules inside the backbone to be modified"}
+    )
+    unfrozen_modules: Optional[List[str]] = field(
+        default_factory=lambda:["deltas"], metadata={"help": "the modules inside the backbone or in the delta modules that need to be unfrozen"}
+    )
+
+    # Delta-type-specific arguments
+    # Adapter:
+    bottleneck_dim: Optional[int] = field(
+        default=24, metadata={"help": "the dimension of the bottleneck layer"}
+    )
+    finetuned_model_path: Optional[str] = field(
+        default=None, metadata={"help": "the path of the finetuned delta model"}
+    )
+
+
+
+
+
+    # ['--backbone_model', 't5', '--bottleneck_dim', '24', '--delta_type', 'adapter', '--model_path_public', 't5-base', '--unfrozen_modules', "['deltas',", "'layer_norm',", "'final_layer_norm']"]
 
 class RemainArgHfArgumentParser(HfArgumentParser):
-    def parse_json_file(self, json_file: str, return_remaining_args=True ):
+    def parse_json_file(self, json_file: str, command_line_args=None, return_remaining_args=True ):
         """
         Alternative helper method that does not use `argparse` at all, instead loading a json file and populating the
         dataclass types.
@@ -222,17 +260,36 @@ class RemainArgHfArgumentParser(HfArgumentParser):
         from pathlib import Path
         import dataclasses
 
-        data = json.loads(Path(json_file).read_text())
-        outputs = []
-        for dtype in self.dataclass_types:
-            keys = {f.name for f in dataclasses.fields(dtype) if f.init}
-            inputs = {k: data.pop(k) for k in list(data.keys()) if k in keys}
-            obj = dtype(**inputs)
-            outputs.append(obj)
+        print("Here", command_line_args)
 
-        remain_args = argparse.ArgumentParser()
-        remain_args.__dict__.update(data)
-        if return_remaining_args:
-            return (*outputs, remain_args)
-        else:
-            return (*outputs,)
+        data = json.loads(Path(json_file).read_text())
+
+
+        data_str = ""
+        for key in data:
+            if "--"+key not in command_line_args:
+                data_str+= "--" + key + " " + str(data[key]) + " "
+
+        data_list = data_str.split()
+        data_list += command_line_args
+
+        return self.parse_args_into_dataclasses(args=data_list, return_remaining_strings=return_remaining_args)
+
+        # namespace, remaining_args = self.parse_known_args(args=data_list)
+
+        # print("Here", command_line_args, data_list,namespace, remaining_args)
+        # data.update(remain_args)
+
+        # outputs = []
+        # for dtype in self.dataclass_types:
+        #     keys = {f.name for f in dataclasses.fields(dtype) if f.init}
+        #     inputs = {k: namespace.get(k) for k in list(data.keys()) if k in keys}
+        #     obj = dtype(**inputs)
+        #     outputs.append(obj)
+
+        # # remain_args = argparse.ArgumentParser()
+        # remain_args.__dict__.update(remain_args)
+        # if return_remaining_args:
+        #     return (*outputs, remain_args)
+        # else:
+        #     return (*outputs,)
