@@ -107,7 +107,7 @@ class hello:
 class submit:
     def GET(self, _):
         global names
-        names = [name.strip("root.") for name in web.input().name.split(";")]
+        names = [name.strip("root.") for name in web.input(name=[]).name]
         app.stop()
 
 def interactive(model, port=8888):
