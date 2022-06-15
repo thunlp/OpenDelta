@@ -165,7 +165,7 @@ for (i = 0; i < coll.length; i++) {
 var submit = document.getElementById("submit");
 submit.addEventListener("click", function() {
     const Http = new XMLHttpRequest();
-    const url='/submit/?name='+array.join(";");
+    const url='/submit/?name='+array.join("&name=");
     Http.open("GET", url);
     Http.send();
     alert("Now go back to your console")
