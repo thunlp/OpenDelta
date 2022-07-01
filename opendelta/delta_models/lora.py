@@ -3,10 +3,10 @@ from typing import Optional, Union
 from opendelta.utils.signature import get_arg_names, get_arg_names_inside_func
 from opendelta.utils.name_based_addressing import *
 from opendelta.basemodel import DeltaBase
-from transformers.models.t5 import T5ForConditionalGeneration
 import torch.nn as nn
 from opendelta import BaseDeltaConfig
 import math
+from dataclasses import dataclass, field
 
 class LowRankLinear(nn.Module):
     #  ------------------------------------------------------------------------------------------
@@ -40,6 +40,11 @@ class LowRankLinear(nn.Module):
     def forward(self, x):
         return (self.lora_dropout(x) @ self.lora_A.T @ self.lora_B.T) * self.scaling
 
+@dataclass
+class LoraArguments:
+    r: int = 8
+    lora_alpha: int = 16
+    lora_dropout: float = 0.0
 
 class LoraConfig(BaseDeltaConfig):
     r"""

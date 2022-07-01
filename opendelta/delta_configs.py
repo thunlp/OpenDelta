@@ -108,7 +108,7 @@ class BaseDeltaConfig(PushToHubMixin):
 
 
     @classmethod
-    def from_finetuned(cls, finetuned_model_name_or_path: Union[str, os.PathLike], **kwargs) -> "BaseDeltaConfig":
+    def from_finetuned(cls, finetuned_model_path: Union[str, os.PathLike], **kwargs) -> "BaseDeltaConfig":
         r"""
         Instantiate a :obj:`BaseDeltaConfig` (or a derived class) from a finetined delta module configuration.
 
@@ -132,7 +132,7 @@ class BaseDeltaConfig(PushToHubMixin):
             delta_config = LoraConfig.from_finetuned("DeltaHub/lora_t5-base_mrpc")
 
         """
-        config_dict, kwargs = cls.get_config_dict(finetuned_model_name_or_path, **kwargs)
+        config_dict, kwargs = cls.get_config_dict(finetuned_model_path, **kwargs)
         if "model_type" in config_dict and hasattr(cls, "model_type") and config_dict["model_type"] != cls.model_type:
             logger.warn(
                 f"You are using a model of type {config_dict['model_type']} to instantiate a model of type "
@@ -254,24 +254,29 @@ class BaseDeltaConfig(PushToHubMixin):
             local_files_only = True
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+
+
         if os.path.isfile(pretrained_model_name_or_path) or is_remote_url(pretrained_model_name_or_path):
             config_file = pretrained_model_name_or_path
         else:
-            configuration_file = get_configuration_file(
-                pretrained_model_name_or_path,
-                revision=revision,
-                use_auth_token=use_auth_token,
-                local_files_only=local_files_only,
-            )
-
+            # configuration_file = get_configuration_file(
+            #     pretrained_model_name_or_path,
+            #     revision=revision,
+            #     use_auth_token=use_auth_token,
+            #     local_files_only=local_files_only,
+            # )
+            print("cache_dir", cache_dir, "|||", "pretrained_model_name_or_path", pretrained_model_name_or_path)
 
             if os.path.isdir(pretrained_model_name_or_path):
-                config_file = os.path.join(pretrained_model_name_or_path, configuration_file)
+                config_file = os.path.join(pretrained_model_name_or_path, "config.json")
+            elif os.path.isdir(os.path.join(cache_dir, pretrained_model_name_or_path)):
+                config_file = os.path.join(cache_dir, pretrained_model_name_or_path, "config.json")
             else:
                 config_file = hf_bucket_url(
                     pretrained_model_name_or_path, filename=configuration_file, revision=revision, mirror=None
                 )
 
+        print("config file!!", config_file)
         try:
             # Load from URL or cache if already cached
             resolved_config_file = cached_path(

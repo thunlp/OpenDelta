@@ -26,6 +26,7 @@ You can also adapt this script on your own tasks.
 
 import os
 import sys
+
 os.environ['MKL_THREADING_LAYER'] = 'GNU'
 os.environ['MKL_SERVICE_FORCE_INTEL'] = '1'
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -56,7 +57,7 @@ from transformers.trainer_utils import is_main_process, get_last_checkpoint
 
 from data_processors import AutoTask #, #TaskDataCollatorForSeq2Seq, AutoPostProcessor, data_collator
 from utils import read_json, save_json
-from utils.args import ModelArguments, TrainingArguments, DataTrainingArguments, RemainArgHfArgumentParser
+from utils.args import ModelArguments, TrainingArguments, DataTrainingArguments, DeltaArguments, RemainArgHfArgumentParser
 
 
 logger = logging.getLogger(__name__)
@@ -66,16 +67,14 @@ def main():
     # See all possible arguments in src/transformers/training_args.py
     # or by passing the --help flag to this script.
     # We now keep distinct sets of args, for a cleaner separation of concerns.
-    parser = RemainArgHfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
-    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        # If we pass only one argument to the script and it's the path to a json file,
-        # let's parse it to get our arguments.
-        model_args, data_args, training_args, delta_args, remain_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
-    else:
-        model_args, data_args, training_args, delta_args, remain_args = parser.parse_args_into_dataclasses(return_remaining_strings=True)
+    parser = RemainArgHfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments, DeltaArguments))
 
+    # You can provide a json file with contains the arguments and use the --argument some_arg to override or append to  the json file.
+    json_file, cmd_args = (os.path.abspath(sys.argv[1]), sys.argv[2:]) if sys.argv[1].endswith(".json") else (None, sys.argv[1:])
+    model_args, data_args, training_args, delta_args, remain_args = parser.parse_json_file_with_cmd_args(json_file=json_file, command_line_args=cmd_args)
+    logger.warning("The following arguments not used! {}".format(remain_args))
 
-    print(f"{training_args.output_dir}/results.json")
+    logger.info(f"The results will be used in {training_args.output_dir}/results.json")
     # exit()
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -161,7 +160,8 @@ def main():
 
     if delta_args.delta_type.lower() != "none":
         from opendelta import AutoDeltaConfig,AutoDeltaModel
-        delta_config = AutoDeltaConfig.from_dict(vars(delta_args))
+        from dataclasses import asdict
+        delta_config = AutoDeltaConfig.from_dict(asdict(delta_args))
         delta_model = AutoDeltaModel.from_config(delta_config, backbone_model=model)
         delta_model.freeze_module(set_state_dict = True)
         delta_model.log(delta_ratio=True, trainable_ratio=True, visualization=True)
@@ -278,14 +278,9 @@ def main():
 
     if torch.cuda.is_available() and training_args.compute_memory:
         peak_memory = (torch.cuda.max_memory_allocated() / 1024 ** 2)/1000
-        print(
-            "Memory utilization",
-            peak_memory,
-            "GB"
-        )
         performance_metrics.update({"peak_memory": peak_memory})
     if training_args.compute_memory or training_args.compute_time:
-        print("Efficiency Statistics {}".format(performance_metrics))
+        logger.info("Efficiency Statistics {}".format(performance_metrics))
         trainer.save_metrics("performance", performance_metrics)
 
     # Evaluation
@@ -326,10 +321,13 @@ def main():
     # all_results['repo_name'] = repo_name
 
 
-    delta_model.save_finetuned(push_to_hf=training_args.push_to_hf,
+    delta_model.save_finetuned(finetuned_delta_path=delta_args.finetuned_delta_path,
                                push_to_dc=training_args.push_to_dc,
-                               center_args={},
+                               center_args={"test_performance":all_results['test'][data_args.task_name]['test_average_metrics'],
+                                            },
                                center_args_pool = {**vars(model_args), **vars(data_args), **vars(training_args), **vars(delta_args)},
+                               list_tags = ['NLI'],
+                               dict_tags = {'purpose':'for testing'},
                                delay_push=True,
                             )
 

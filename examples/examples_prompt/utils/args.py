@@ -1,7 +1,10 @@
-from calendar import c
 from dataclasses import dataclass, field
 from typing import Optional, List
 from transformers import HfArgumentParser
+from pathlib import Path
+import sys
+
+
 
 @dataclass
 class ModelArguments:
@@ -215,6 +218,10 @@ class DataTrainingArguments:
         if self.test_max_target_length is None:
             self.test_max_target_length = self.max_target_length
 
+
+
+import dataclasses
+
 @dataclass
 class DeltaArguments:
     """
@@ -233,47 +240,152 @@ class DeltaArguments:
     unfrozen_modules: Optional[List[str]] = field(
         default_factory=lambda:["deltas"], metadata={"help": "the modules inside the backbone or in the delta modules that need to be unfrozen"}
     )
-
-    # Delta-type-specific arguments
-    # Adapter:
-    bottleneck_dim: Optional[int] = field(
-        default=24, metadata={"help": "the dimension of the bottleneck layer"}
-    )
-    finetuned_model_path: Optional[str] = field(
+    finetuned_delta_path: Optional[str] = field(
         default=None, metadata={"help": "the path of the finetuned delta model"}
     )
 
+    def merge_arguments(self, objb):
+        print(objb)
+        self.__class__ = dataclasses.make_dataclass('DeltaArgument', fields=[(s.name, s.type, getattr(objb, s.name)) for s in dataclasses.fields(objb)], bases=(DeltaArguments,))
 
 
 
 
-    # ['--backbone_model', 't5', '--bottleneck_dim', '24', '--delta_type', 'adapter', '--model_path_public', 't5-base', '--unfrozen_modules', "['deltas',", "'layer_norm',", "'final_layer_norm']"]
+@dataclass
+class AdapterArguments:
+    bottleneck_dim: Optional[int] = field(
+        default=24, metadata={"help": "the dimension of the bottleneck layer"}
+    )
+
+
+DELTAARGMAP = {
+    "adapter": AdapterArguments
+}
+
+# TODO: add more specific delta arguments
+
+
 
 class RemainArgHfArgumentParser(HfArgumentParser):
-    def parse_json_file(self, json_file: str, command_line_args=None, return_remaining_args=True ):
+    '''This is a more powerful version of argument parser.
+    It can receiven both command line arguments and json file arguments.
+    The command line arguments will override the json file arguments.
+    The parser will load the specific delta arguments (e.g. Adapter's)
+    according to the delta_type argument. And merge the specific delta arguments
+    with the common delta arguments.
+    '''
+    def parse_json_file_with_cmd_args(self, json_file: str, command_line_args=None, return_remaining_args=True ):
         """
         Alternative helper method that does not use `argparse` at all, instead loading a json file and populating the
         dataclass types.
         """
-        import argparse
+
         import json
         from pathlib import Path
-        import dataclasses
 
-        print("Here", command_line_args)
+
 
         data = json.loads(Path(json_file).read_text())
 
 
         data_str = ""
+        if command_line_args is None:
+            command_line_args = []
         for key in data:
             if "--"+key not in command_line_args:
-                data_str+= "--" + key + " " + str(data[key]) + " "
+                if isinstance(data[key], list):
+                    data_str += "--"+key
+                    for elem in data[key]:
+                        data_str+=" "+ str(elem)
+                    data_str += " "
+                else:
+                    data_str+= "--" + key + " " + str(data[key]) + " "
 
         data_list = data_str.split()
         data_list += command_line_args
 
-        return self.parse_args_into_dataclasses(args=data_list, return_remaining_strings=return_remaining_args)
+
+        if return_remaining_args:
+            outputs, remain_args = self.parse_args_into_dataclasses(args=data_list, return_remaining_strings=return_remaining_args)
+            for d in outputs:
+                if isinstance(d, DeltaArguments): # merge the specific delta arguments
+                    d.merge_arguments(outputs[-1])
+            return *(outputs[:-1]), remain_args
+        else:
+            outputs = self.parse_args_into_dataclasses(args=data_list, return_remaining_strings=return_remaining_args)
+            for d in outputs:
+                if isinstance(d, DeltaArguments):
+                    d.merge_arguments(outputs[-1])
+            return (*(outputs[:-1]),)
+
+    def parse_args_into_dataclasses(
+        self, args=None, return_remaining_strings=False, look_for_args_file=True, args_filename=None
+    ):
+        """
+        Parse command-line args into instances of the specified dataclass types.
+
+        This relies on argparse's `ArgumentParser.parse_known_args`. See the doc at:
+        docs.python.org/3.7/library/argparse.html#argparse.ArgumentParser.parse_args
+
+        Args:
+            args:
+                List of strings to parse. The default is taken from sys.argv. (same as argparse.ArgumentParser)
+            return_remaining_strings:
+                If true, also return a list of remaining argument strings.
+            look_for_args_file:
+                If true, will look for a ".args" file with the same base name as the entry point script for this
+                process, and will append its potential content to the command line args.
+            args_filename:
+                If not None, will uses this file instead of the ".args" file specified in the previous argument.
+
+        Returns:
+            Tuple consisting of:
+
+                - the dataclass instances in the same order as they were passed to the initializer.abspath
+                - if applicable, an additional namespace for more (non-dataclass backed) arguments added to the parser
+                  after initialization.
+                - The potential list of remaining argument strings. (same as argparse.ArgumentParser.parse_known_args)
+        """
+        if args_filename or (look_for_args_file and len(sys.argv)):
+            if args_filename:
+                args_file = Path(args_filename)
+            else:
+                args_file = Path(sys.argv[0]).with_suffix(".args")
+
+            if args_file.exists():
+                fargs = args_file.read_text().split()
+                args = fargs + args if args is not None else fargs + sys.argv[1:]
+                # in case of duplicate arguments the first one has precedence
+                # so we append rather than prepend.
+        namespace, remaining_args = self.parse_known_args(args=args)
+
+        # conditionally add delta arguments
+        deltatype_args = DELTAARGMAP[namespace.delta_type]
+        self.dataclass_types.append(deltatype_args)
+        self._add_dataclass_arguments(deltatype_args)
+
+        # parse the arguments again, this time with the specific delta type's arguments
+        namespace, remaining_args = self.parse_known_args(args=args)
+
+
+        outputs = []
+        for dtype in self.dataclass_types:
+            keys = {f.name for f in dataclasses.fields(dtype) if f.init}
+            inputs = {k: v for k, v in vars(namespace).items() if k in keys}
+            for k in keys:
+                delattr(namespace, k)
+            obj = dtype(**inputs)
+            outputs.append(obj)
+        if len(namespace.__dict__) > 0:
+            # additional namespace.
+            outputs.append(namespace)
+        if return_remaining_strings:
+            return (outputs, remaining_args)
+        else:
+            if remaining_args:
+                raise ValueError(f"Some specified arguments are not used by the HfArgumentParser: {remaining_args}")
+
+            return outputs
 
         # namespace, remaining_args = self.parse_known_args(args=data_list)
 
@@ -293,3 +405,5 @@ class RemainArgHfArgumentParser(HfArgumentParser):
         #     return (*outputs, remain_args)
         # else:
         #     return (*outputs,)
+
+

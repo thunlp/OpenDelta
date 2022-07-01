@@ -11,6 +11,8 @@ from opendelta import BaseDeltaConfig
 import opendelta.utils.logging as logging
 import numpy as np
 from opendelta import global_setting
+from dataclasses import dataclass, field
+
 logger = logging.get_logger(__name__)
 
 
@@ -139,7 +141,7 @@ class AdapterConfig(BaseDeltaConfig):
         self,
         bottleneck_dim: Optional[int]=24,
         non_linearity: Optional[str]='gelu_new',
-        sequential: Optional[str] = True,
+        sequential: Optional[bool] = True,
         **kwargs
     ):
         super().__init__(**kwargs)

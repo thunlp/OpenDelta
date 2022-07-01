@@ -47,20 +47,20 @@ def spearman_corrcoef(predictions, targets) -> dict:
 
 
 
-def spearman_corrcoef(predictions, targets) -> dict:
-    """Computes Spearman correlation coefficient."""
-    # TODO: we need to do postprocessors in a clean way for each dataset.
-    from examples_seq2seq.data_processors.postprocessors import string_to_float
-    targets = [string_to_float(target) for target in targets]
-    predictions= [string_to_float(prediction) for prediction in predictions]
-    spearman_corrcoef = 100 * scipy.stats.spearmanr(targets, predictions)[0]
+# def spearman_corrcoef(predictions, targets) -> dict:
+#     """Computes Spearman correlation coefficient."""
+#     # TODO: we need to do postprocessors in a clean way for each dataset.
+#     from examples_seq2seq.data_processors.postprocessors import string_to_float
+#     targets = [string_to_float(target) for target in targets]
+#     predictions= [string_to_float(prediction) for prediction in predictions]
+#     spearman_corrcoef = 100 * scipy.stats.spearmanr(targets, predictions)[0]
 
-    # Note that if all the predictions will be the same, spearman
-    # correlation is nan, to gaurad against this, we check the output
-    # and return 0 in this case.
-    if math.isnan(spearman_corrcoef):
-        spearman_corrcoef = 0
-    return {"spearmanr": spearman_corrcoef}
+#     # Note that if all the predictions will be the same, spearman
+#     # correlation is nan, to gaurad against this, we check the output
+#     # and return 0 in this case.
+#     if math.isnan(spearman_corrcoef):
+#         spearman_corrcoef = 0
+#     return {"spearmanr": spearman_corrcoef}
 
 
 def f1_score_with_invalid(predictions, targets) -> dict:

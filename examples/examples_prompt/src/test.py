@@ -63,40 +63,32 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    # See all possible arguments in src/transformers/training_args.py
-    # or by passing the --help flag to this script.
-    # We now keep distinct sets of args, for a cleaner separation of concerns.
     parser = RemainArgHfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments, DeltaArguments))
-    print("here1")
-    if sys.argv[1].endswith(".json"):
-        print("here2", sys.argv[2:])
-        # If we pass only one argument to the script and it's the path to a json file,
-        # let's parse it to get our arguments.
-        model_args, data_args, training_args, delta_args, remain_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]), command_line_args=sys.argv[2:])
-    else:
-        model_args, data_args, training_args, delta_args = parser.parse_args_into_dataclasses(return_remaining_strings=True)
 
+    # You can provide a json file with contains the arguments and use the --argument some_arg to override or append to  the json file.
+    json_file, cmd_args = (os.path.abspath(sys.argv[1]), sys.argv[2:]) if sys.argv[1].endswith(".json") else (None, sys.argv[1:])
+    model_args, data_args, training_args, delta_args, remain_args = parser.parse_json_file_with_cmd_args(json_file=json_file, command_line_args=cmd_args)
+    logger.warning("The following arguments not used! {}".format(remain_args))
 
-    print(f"{training_args.output_dir}/results.json")
-    # exit()
-    # Detecting last checkpoint.
-    last_checkpoint = None
-    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
-        last_checkpoint = get_last_checkpoint(training_args.output_dir)
-        print("#### last_checkpoint ", last_checkpoint)
-        if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 0:
-            '''
-            raise ValueError(
-                f"Output directory ({training_args.output_dir}) already exists and is not empty. "
-                "Use --overwrite_output_dir to overcome."
-            )
-            '''
-            pass
-        elif last_checkpoint is not None:
-            logger.info(
-                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
-                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
-            )
+    # # exit()
+    # # Detecting last checkpoint.
+    # last_checkpoint = None
+    # if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
+    #     last_checkpoint = get_last_checkpoint(training_args.output_dir)
+    #     print("#### last_checkpoint ", last_checkpoint)
+    #     if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 0:
+    #         '''
+    #         raise ValueError(
+    #             f"Output directory ({training_args.output_dir}) already exists and is not empty. "
+    #             "Use --overwrite_output_dir to overcome."
+    #         )
+    #         '''
+    #         pass
+    #     elif last_checkpoint is not None:
+    #         logger.info(
+    #             f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
+    #             "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+    #         )
 
     # Setup logging
     logging.basicConfig(
@@ -149,8 +141,6 @@ def main():
 
 
 
-
-
     config, tokenizer, model = get_backbone(model_args=model_args)
 
     # model parallelize
@@ -164,12 +154,9 @@ def main():
     if delta_args.delta_type.lower() != "none":
         from opendelta import AutoDeltaConfig,AutoDeltaModel
         # delta_config = AutoDeltaConfig.from_dict(vars(delta_args))
-        delta_model = AutoDeltaModel.from_finetuned(delta_args.finetuned_model_path, backbone_model=model)
+        delta_model = AutoDeltaModel.from_finetuned(finetuned_model_path=delta_args.finetuned_model_path, cache_dir="saved_ckpts", backbone_model=model)
         # delta_model.freeze_module(set_state_dict = True)
         delta_model.log(delta_ratio=True, trainable_ratio=True, visualization=True)
-
-
-
 
 
     performance_metrics = {}

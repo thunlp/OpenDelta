@@ -343,7 +343,7 @@ class SuperGLUECB(AbstractTask):
                            "validation": "validation",
                            "test": "validation"}
     metric = [metrics.mean_multiclass_f1(num_classes=3), metrics.accuracy]
-    metric_names = ["f1_multiclass", "accuracy"]
+    metric_names = ["accuracy"]
 
     verbalizers = {
         "0":{"0": "yes",

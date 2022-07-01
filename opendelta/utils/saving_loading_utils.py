@@ -71,6 +71,10 @@ class DeltaCenterArguments:
         default=None,
         metadata={"help": "the performance of the model on the test set"}
     )
+    test_metrics: Optional[str] = field(
+        default=None,
+        metadata={"help": "the metrics used by the model"}
+    )
     trainable_ratio: Optional[float] = field(
         default=None,
         metadata={"help": "the ratio of trainable parameters in the model"}
@@ -93,15 +97,15 @@ class SaveLoadMixin(PushToHubMixin):
 
     def save_finetuned(
         self,
-        save_directory: Optional[Union[str, os.PathLike]] = "./output/",
+        finetuned_delta_path: Optional[Union[str, os.PathLike]] = "./delta_checkpoints/",
         save_config: bool = True,
         state_dict: Optional[dict] = None,
         save_function: Callable = torch.save,
         push_to_dc: bool = True,
         center_args: Optional[Union[DeltaCenterArguments, dict]] = None,
         center_args_pool: Optional[dict] = None,
-        center_value_only_tags: Optional[List] = None,
-        center_key_value_tags: Optional[Dict] = None,
+        list_tags: Optional[List] = None,
+        dict_tags: Optional[Dict] = None,
         delay_push: bool = False,
     ):
         r"""
@@ -129,9 +133,9 @@ class SaveLoadMixin(PushToHubMixin):
             center_args_pool (:obj:`dict`, *optional*, defaults to :obj:`None`): The arguments's pool for DeltaCenter
                 Together with center_args, they are are used to distinguish between different delta models on the DeltaCenter.
                 It will be used to group delta models.
-            center_value_only_tags (:obj:`List`, *optional*, defaults to :obj:`None`): The tags in the form of list for the delta model, it is the
+            list_tags (:obj:`List`, *optional*, defaults to :obj:`None`): The tags in the form of list for the delta model, it is the
                 optional identifiers that are not expected by `DeltaCenterArgument`. It will not be used to group delta models in the delta center
-            center_key_value_tags (:obj:`Dict`, *optional*, defaults to :obj:`None`): The tags in the form of dictionary for the delta model, it is the
+            dict_tags (:obj:`Dict`, *optional*, defaults to :obj:`None`): The tags in the form of dictionary for the delta model, it is the
                 optional identifiers that are not expected by `DeltaCenterArgument`. It will not be used to group delta models in the delta center.
             delay_push (:obj:`bool`, *optional*, defaults to :obj:`False`): Whether or not to delay the push to the DeltaCenter. When set to True,
                 the delta object will be saved locally to save_directory, you can push it later using
@@ -142,6 +146,7 @@ class SaveLoadMixin(PushToHubMixin):
 
 
         """
+        save_directory = finetuned_delta_path
         if os.path.isfile(save_directory):
             logger.error(f"Provided path ({save_directory}) should be a directory, not a file")
             return
@@ -169,26 +174,36 @@ class SaveLoadMixin(PushToHubMixin):
         final_center_args = self.create_delta_center_args(center_args=center_args,
                         center_args_pool=center_args_pool)
 
-        print("final_center_args", final_center_args)
-
         if push_to_dc:
-            self.create_yml(save_directory, final_center_args, center_value_only_tags, center_key_value_tags)
+            self.create_yml(save_directory, final_center_args, list_tags, dict_tags)
+
         if not delay_push:
             OssClient.upload(base_dir=save_directory)
+        else:
+            logger.info("\n"+"*"*30+f"\nYou delta models has been saved locally to:\n\t\t{os.path.abspath(save_directory)}\
+                 \nyou can push it to the delta center later using \n\t\tpython -m DeltaCenter upload {os.path.abspath(save_directory)}\n"
+                 +"*"*30)
+
+        # get absolute path of saved_directory,
 
 
     def create_yml(self, save_dir, config, list_tags=None, dict_tags=None):
         f = open("{}/config.yml".format(save_dir), 'w')
-        yaml.safe_dump(vars(config), f)
+        config_dict = vars(config)
+        config_dict['dict_tags'] = dict_tags if dict_tags is not None else {}
+        config_dict['list_tags'] = list_tags if list_tags is not None else []
+        yaml.safe_dump(config_dict, f)
         f.close()
 
     @classmethod
     def from_finetuned(cls,
-                       finetuned_model_name_or_path: Optional[Union[str, os.PathLike]],
+                       finetuned_delta_path: Optional[Union[str, os.PathLike]],
                        backbone_model: nn.Module,
-                        *model_args,
-                        check_hash: Optional[bool] = True,
-                        **kwargs):
+                       delta_config = None,
+                       cache_dir: Optional[Union[str, os.PathLike]] = None,
+                       *model_args,
+                       check_hash: Optional[bool] = True,
+                       **kwargs):
         r"""
         Instantiate a finetuned delta model from a path.
         The backbone_model is set in evaluation mode by default using ``model.eval()`` (Dropout modules are deactivated).
@@ -196,7 +211,7 @@ class SaveLoadMixin(PushToHubMixin):
 
         Parameters:
 
-            finetuned_model_name_or_path (:obj:`str` or :obj:`os.PathLike`, *optional*):
+            finetuned_model_path (:obj:`str` or :obj:`os.PathLike`, *optional*):
                 Can be either:
 
                 - A string, the *model id* of a pretrained model hosted inside a model repo on huggingface.co.
@@ -297,9 +312,9 @@ class SaveLoadMixin(PushToHubMixin):
 
 
         """
-        config = kwargs.pop("config", None)
+        # config = kwargs.pop("config", None)
         state_dict = kwargs.pop("state_dict", None)
-        cache_dir = kwargs.pop("cache_dir", None)
+        # cache_dir = kwargs.pop("cache_dir", None)
 
         # ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", False)
         force_download = kwargs.pop("force_download", False)
@@ -323,10 +338,10 @@ class SaveLoadMixin(PushToHubMixin):
             local_files_only = True
 
         # Load config if we don't provide a configuration
-        if not isinstance(config, BaseDeltaConfig):
-            config_path = config if config is not None else finetuned_model_name_or_path
-            config, model_kwargs = cls.config_class.from_finetuned(
-                config_path,
+        if not isinstance(delta_config, BaseDeltaConfig):
+            # config_path = delta_config if delta_config is not None else finetuned_model_path # Todo check
+            delta_config, model_kwargs = cls.config_class.from_finetuned(
+                finetuned_model_path,
                 cache_dir=cache_dir,
                 return_unused_kwargs=True,
                 force_download=force_download,
@@ -343,23 +358,24 @@ class SaveLoadMixin(PushToHubMixin):
         else:
             model_kwargs = kwargs
 
+        print("delta_config", delta_config)
         # Load model
-        if finetuned_model_name_or_path is not None:
-            finetuned_model_name_or_path = str(finetuned_model_name_or_path)
-            if os.path.isdir(finetuned_model_name_or_path):
-                if os.path.isfile(os.path.join(finetuned_model_name_or_path, WEIGHTS_NAME)):
+        if finetuned_model_path is not None:
+            finetuned_model_path = str(finetuned_model_path)
+            if os.path.isdir(finetuned_model_path):
+                if os.path.isfile(os.path.join(finetuned_model_path, WEIGHTS_NAME)):
                     # Load from a PyTorch checkpoint
-                    archive_file = os.path.join(finetuned_model_name_or_path, WEIGHTS_NAME)
+                    archive_file = os.path.join(finetuned_model_path, WEIGHTS_NAME)
                 else:
                     raise EnvironmentError(
                         f"Error no file named {WEIGHTS_NAME} found in "
-                        f"directory {finetuned_model_name_or_path}."
+                        f"directory {finetuned_model_path}."
                     )
-            elif os.path.isfile(finetuned_model_name_or_path) or is_remote_url(finetuned_model_name_or_path):
-                archive_file = finetuned_model_name_or_path
+            elif os.path.isfile(finetuned_model_path) or is_remote_url(finetuned_model_path):
+                archive_file = finetuned_model_path
             else:
                 archive_file = hf_bucket_url(
-                    finetuned_model_name_or_path,
+                    finetuned_model_path,
                     filename=WEIGHTS_NAME,
                     revision=revision,
                     mirror=mirror,
@@ -381,7 +397,7 @@ class SaveLoadMixin(PushToHubMixin):
             except EnvironmentError as err:
                 logger.error(err)
                 msg = (
-                    f"Can't load weights for '{finetuned_model_name_or_path}'. Make sure that:\n\n"
+                    f"Can't load weights for '{finetuned_model_path}'. Make sure that:\n\n"
                     )
 
                 if revision is not None:
@@ -414,7 +430,7 @@ class SaveLoadMixin(PushToHubMixin):
                             raise ValueError from e
                 except (UnicodeDecodeError, ValueError):
                     raise OSError(
-                        f"Unable to load weights from pytorch checkpoint file for '{finetuned_model_name_or_path}' "
+                        f"Unable to load weights from pytorch checkpoint file for '{finetuned_model_path}' "
                         f"at '{resolved_archive_file}'. "
                         "If you tried to load a PyTorch model from a TF 2.0 checkpoint, please set from_tf=True."
                     )
@@ -469,7 +485,6 @@ class SaveLoadMixin(PushToHubMixin):
         mdict = {}
         field = fields(DeltaCenterArguments)
 
-        print("center_args_pool", center_args_pool)
 
         for f in field:
             exist = False
