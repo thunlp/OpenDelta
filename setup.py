@@ -4,10 +4,9 @@ import os
 import os
 
 def get_requirements(path):
-    print("path is :", path)
     ret = []
-
-    with open(os.path.join(path, "requirements.txt"), encoding="utf-8") as freq:
+    # path = "/home/ubuntu/OpenDelta_beta/OpenDelta/"
+    with open(os.path.join(path, "opendelta.egg-info/requires.txt"), encoding="utf-8") as freq:
         for line in freq.readlines():
             ret.append( line.strip() )
     return ret
@@ -15,12 +14,11 @@ def get_requirements(path):
 
 path = os.path.dirname(os.path.abspath(__file__))
 requires =  get_requirements(path)
-print(requires)
 
 with open('README.md', 'r') as f:
     setuptools.setup(
         name = 'opendelta',
-        version = "0.1.0",
+        version = "0.2.0",
         description = "An open source framework for delta learning (parameter efficient learning).",
         long_description=open("README.md", "r", encoding="utf-8").read(),
         long_description_content_type="text/markdown",
@@ -30,10 +28,10 @@ with open('README.md', 'r') as f:
         url="https://github.com/thunlp/OpenDelta",
         keywords = ['PLM', 'Parameter-efficient-Learning', 'AI', 'NLP'],
         python_requires=">=3.6.0",
-        install_requires=requires,
+        install_requires=get_requirements(path),
         package_dir={'opendelta':'opendelta'},
         package_data= {
-            'opendelta':["utils/interactive/templates/*.html"],
+            'opendelta':["utils/interactive/templates/*.html", 'requirments.txt'],
         },
         include_package_data=True,
         packages=setuptools.find_packages(),
