@@ -328,7 +328,7 @@ def main():
                                center_args_pool = {**vars(model_args), **vars(data_args), **vars(training_args), **vars(delta_args)},
                                list_tags = ['NLI'],
                                dict_tags = {'purpose':'for testing'},
-                               delay_push=True,
+                               delay_push=delta_args.delay_push,
                             )
 
 

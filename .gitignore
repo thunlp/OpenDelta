@@ -38,4 +38,5 @@ log.txt
 **/output/
 **/thunlp/
 **/saved_ckpts/
-
+**/delta_checkpoints/
+**/outputs/

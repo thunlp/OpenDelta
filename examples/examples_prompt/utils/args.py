@@ -243,6 +243,21 @@ class DeltaArguments:
     finetuned_delta_path: Optional[str] = field(
         default=None, metadata={"help": "the path of the finetuned delta model"}
     )
+    force_download: Optional[bool] = field(
+        default=False, metadata={"help": "whether to download the checkpoint form delta center no matter whether it exists"}
+    )
+    local_files_only: Optional[bool] = field(
+        default=False, metadata={"help": "whether not to look for file in delta center"}
+    )
+    delta_cache_dir: Optional[str] = field(
+        default=None, metadata={"help": "The cache path defined by user. If not set, we will firstly look into the"+
+        " working directory and then into the default cache path (ususally ~/.cache/delta_center)."}
+    )
+    delay_push: Optional[bool] = field(
+        default=True, metadata={
+            'help':'whether push the checkpoint to delta center later.'
+        }
+    )
 
     def merge_arguments(self, objb):
         print(objb)

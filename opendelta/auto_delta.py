@@ -2,11 +2,9 @@ from copy import deepcopy
 from typing import Any, Dict, OrderedDict
 from opendelta.utils.visualization import Visualization
 import torch.nn as nn
-from transformers.file_utils import PushToHubMixin
 from opendelta.utils.logging import get_logger
 import importlib
 from opendelta.delta_configs import BaseDeltaConfig
-from opendelta.basemodel import DeltaBase
 logger = get_logger(__name__)
 
 
@@ -114,7 +112,7 @@ class AutoDeltaConfig:
 
 
     @classmethod
-    def from_finetuned(cls, finetuned_model_path, **kwargs):
+    def from_finetuned(cls, finetuned_delta_path, **kwargs):
         r"""
         Instantiate one of the configuration classes of the library from a finetuned delta model configuration.
         The configuration class to instantiate is selected based on the ``delta_type`` property of the config object that
@@ -122,7 +120,7 @@ class AutoDeltaConfig:
 
         Parameters:
 
-            finetuned_model_path (:obj:`str` or :obj:`os.PathLike`, *optional*):
+            finetuned_delta_path (:obj:`str` or :obj:`os.PathLike`, *optional*):
                 Can be either:
 
                 - A string, the *model id* of a finetuned delta model configuration hosted inside a model repo on
@@ -173,20 +171,19 @@ class AutoDeltaConfig:
 
         """
 
-        kwargs["name_or_path"] = finetuned_model_path
 
-        config_dict, _ = BaseDeltaConfig.get_config_dict(finetuned_model_path, **kwargs)
+        config_dict, kwargs = BaseDeltaConfig.get_config_dict(finetuned_delta_path, **kwargs)
         if "delta_type" in config_dict:
             config_class = LAZY_CONFIG_MAPPING[config_dict["delta_type"]]
             return config_class.from_dict(config_dict, **kwargs)
         else:
             # Fallback: use pattern matching on the string.
             for pattern, config_class in LAZY_CONFIG_MAPPING.items():
-                if pattern in str(finetuned_model):
+                if pattern in str(finetuned_delta_path):
                     return config_class.from_dict(config_dict, **kwargs)
 
         raise ValueError(
-            f"Unrecognized model in {finetuned_model_path}. "
+            f"Unrecognized model in {finetuned_delta_path}. "
             f"Should have a `delta_type` key in the loaded config, or contain one of the following strings "
             f"in its name: {', '.join(LAZY_CONFIG_MAPPING.keys())}"
         )
@@ -355,14 +352,14 @@ class AutoDeltaModel:
         )
 
     @classmethod
-    def from_finetuned(cls, finetuned_model_path, backbone_model, *model_args, **kwargs):
+    def from_finetuned(cls, finetuned_delta_path, backbone_model, *model_args, **kwargs):
         r""" Automatically instantiated a delta model and load the finetuned checkpoints based on the
-        :obj:`finetuned_model_path`, which can either be a string pointing to a local path or a url pointint to
+        :obj:`finetuned_delta_path`, which can either be a string pointing to a local path or a url pointint to
         the delta hub. It will check the hash after loading the delta model to see whether the correct backbone and
         delta checkpoint are used.
 
         Args:
-            finetuned_model_path (:obj:`str` or :obj:`os.PathLike`, *optional*):
+            finetuned_delta_path (:obj:`str` or :obj:`os.PathLike`, *optional*):
                 Can be either:
 
                 - A string, the *model id* of a finetuned delta model configuration hosted inside a model repo on
@@ -377,6 +374,7 @@ class AutoDeltaModel:
 
             backbone_model (:obj:`nn.Module`): The backbone model to be modified.
             model_args: Other argument for initialize the model.
+            kwargs: Other kwargs that will be passed into DeltaBase.from_finetuned.
 
         Example:
 
@@ -385,15 +383,15 @@ class AutoDeltaModel:
             delta_model = AutoDeltaModel.from_finetuned("DeltaHub/lora_t5-base-mrpc", backbone_model)
 
         """
-        config = kwargs.pop("config", None)
+        delta_config = kwargs.pop("delta_config", None)
 
-        if not isinstance(config, BaseDeltaConfig):
-            config, kwargs = AutoDeltaConfig.from_finetuned(
-                finetuned_model_path, return_unused_kwargs=True, **kwargs
+        if not isinstance(delta_config, BaseDeltaConfig):
+            delta_config, kwargs = AutoDeltaConfig.from_finetuned(
+                finetuned_delta_path, return_unused_kwargs=True, **kwargs
             )
-        if type(config) in cls._delta_model_mapping.keys():
-            model_class = cls._delta_model_mapping[type(config)]
-            return model_class.from_finetuned(finetuned_model_path, backbone_model, *model_args, **kwargs)
+        if type(delta_config) in cls._delta_model_mapping.keys():
+            model_class = cls._delta_model_mapping[type(delta_config)]
+            return model_class.from_finetuned(finetuned_delta_path, backbone_model, *model_args, delta_config=delta_config,  **kwargs)
         raise ValueError(
             f"Unrecognized configuration class {config.__class__} for this kind of AutoModel: {cls.__name__}.\n"
             f"Model type should be one of {', '.join(c.__name__ for c in cls._model_mapping.keys())}."
