@@ -8,3 +8,4 @@ decorator
 rich
 web.py
 gitpython
+delta_center_client
