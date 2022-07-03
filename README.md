@@ -33,7 +33,7 @@ OpenDelta is a toolkit for parameter efficient methods (we dub it as *delta tuni
 
 ## Updates
 - 2022.03.24 We notice several bugs in Soft Prompt Tuning and Prefix Tuning, mainly due to their need to customize attention ids, token_type_ids, we are fixing it! Currently, please use the other methods since they are stabler and better in performance. 
-- 2022.03.20 Add a [colab example](https://colab.research.google.com/drive/1hM_zu11s6plpK-YQSkz3CrowJyxtHneY?usp=sharing) to illustrate efficient training and space-saving multitask-serving.
+- 2022.03.20 Add a [colab example](https://colab.research.google.com/drive/1uAhgAdc8Qr42UKYDlgUv0f7W1-gAFwGo?usp=sharing) to illustrate efficient training and space-saving multitask-serving.
 - 2022.03.20 A new pip version released.
 - 2022.02.16 Support [regular expression](https://opendelta.readthedocs.io/en/latest/notes/namebasedaddr.html#regexexpr) in named-based addressing. 
 
@@ -76,9 +76,9 @@ python setup.py develop
 
 ```python
 from transformers import AutoModelForSeq2SeqLM
-t5 = AutoModelForSeq2SeqLM.from_pretrained("t5-base")
+t5 = AutoModelForSeq2SeqLM.from_pretrained("t5-large")
 from opendelta import AutoDeltaModel
-delta = AutoDeltaModel.from_finetuned("DeltaHub/lora_t5-base_mrpc", backbone_model=t5)
+delta = AutoDeltaModel.from_finetuned("thunlp/FactQA_T5-large_Adapter", backbone_model=t5)
 delta.log()
 ```
 
@@ -104,13 +104,6 @@ used models that OpenDelta are sure to support.
 | T5-3b(parallel)| ✅  | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  |
 | Deberta-v2     | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  |     |     |
 | CTRL           | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  |     |     |
-| ViT            | ✅  |     |    |     |     |      |   |     |     |
 
-
-## Performance Checked Combination
-
-Google sheet [here](https://docs.google.com/spreadsheets/d/1BIVa8ocAPga-u7rBOXLYaTfaJSjI1dWfwohmLjmFDrY/edit?usp=sharing)
-
-Subject to change at any moment. 
 
 
