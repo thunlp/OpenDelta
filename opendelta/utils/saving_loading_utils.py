@@ -91,10 +91,10 @@ class SaveLoadMixin:
         state_dict: Optional[dict] = None,
         save_function: Callable = torch.save,
         push_to_dc: bool = True,
-        center_args: Optional[Union[DeltaCenterArguments, dict]] = None,
-        center_args_pool: Optional[dict] = None,
-        list_tags: Optional[List] = None,
-        dict_tags: Optional[Dict] = None,
+        center_args: Optional[Union[DeltaCenterArguments, dict]] = dict(),
+        center_args_pool: Optional[dict] = dict(),
+        list_tags: Optional[List] = list(),
+        dict_tags: Optional[Dict] = dict(),
         delay_push: bool = False,
     ):
         r"""
@@ -106,10 +106,11 @@ class SaveLoadMixin:
                 If not specified, the model will be saved in the directory ``./delta_checkpoints/``,
                 which is a subdirectory of the current working directory.
             save_config: (optional) if ``True``, the configuration file will be saved in the same directory as the
-                model file.
+                model file. if ``False``, only the state dict will be saved.
             state_dict: (optional) a dictionary containing the model's state_dict. If not specified, the
                 state_dict is loaded from the backbone model's trainable parameters.
             save_function: (optional) the function used to save the model. Defaults to ``torch.save``.
+            state_dict_only: (optional) if ``True``, only the state_dict will be saved.
             push_to_dc: (optional) if ``True``, the model will prepare things to pushed to the DeltaCenter.
                 This includes:
                 - creating a configuration file for the model
@@ -131,7 +132,8 @@ class SaveLoadMixin:
                 self.create_config_from_model()
             self.add_configs_when_saving()
 
-        final_center_args = self.create_delta_center_args(center_args=center_args,
+        if push_to_dc:
+            final_center_args = self.create_delta_center_args(center_args=center_args,
                         center_args_pool=center_args_pool)
 
         save_directory = finetuned_delta_path
@@ -140,8 +142,10 @@ class SaveLoadMixin:
             return
 
         os.makedirs(save_directory, exist_ok=True)
-        save_directory = os.path.join(save_directory, final_center_args.name)
-        os.makedirs(save_directory, exist_ok=True)
+
+        if push_to_dc:
+            save_directory = os.path.join(save_directory, final_center_args.name)
+            os.makedirs(save_directory, exist_ok=True)
 
         model_to_save = self.backbone_model# unwrap_model(self)
 
@@ -149,12 +153,12 @@ class SaveLoadMixin:
         if state_dict is None:
             state_dict = model_to_save.state_dict()
 
-        # Save the config
-        if save_config:
-            self.config.save_finetuned(save_directory)
-
         output_model_file = os.path.join(save_directory, WEIGHTS_NAME)
         save_function(state_dict, output_model_file)
+
+         # Save the config
+        if save_config:
+            self.config.save_finetuned(save_directory)
 
 
         logger.info("\n"+"*"*30+f"\nYou delta models has been saved locally to:\n\t{os.path.abspath(save_directory)}"
@@ -164,23 +168,35 @@ class SaveLoadMixin:
             logger.info("Creating yaml file for delta center")
             self.create_yml(save_directory, final_center_args, list_tags, dict_tags)
 
-
-        if not delay_push:
-            OssClient.upload(base_dir=save_directory)
-        else:
-            logger.info("Delay push: you can push it to the delta center later using \n\tpython -m DeltaCenter upload {os.path.abspath(save_directory)}\n"
-                 +"*"*30)
-
-        # get absolute path of saved_directory,
+            if not delay_push:
+                OssClient.upload(base_dir=save_directory)
+            else:
+                logger.info(f"Delay push: you can push it to the delta center later using \n\tpython -m DeltaCenter upload {os.path.abspath(save_directory)}\n"
+                    +"*"*30)
 
 
-    def create_yml(self, save_dir, config, list_tags=None, dict_tags=None):
+
+
+    def create_yml(self, save_dir, config, list_tags=list(), dict_tags=dict()):
         f = open("{}/config.yml".format(save_dir), 'w')
         config_dict = vars(config)
-        config_dict['dict_tags'] = dict_tags if dict_tags is not None else {}
-        config_dict['list_tags'] = list_tags if list_tags is not None else []
+        config_dict['dict_tags'] = dict_tags
+        config_dict['list_tags'] = list_tags
         yaml.safe_dump(config_dict, f)
         f.close()
+
+    def load_checkpoint(self, path, load_func=torch.load, backbone_model=None):
+        r"""Simple method for loading only the checkpoint
+        """
+        if backbone_model is None:
+            backbone_model = self.backbone_model
+        self.backbone_model.load_state_dict(load_func(f"{path}/{WEIGHTS_NAME}"), strict=False)
+
+    def save_checkpoint(self, path, save_func=torch.save, backbone_model=None):
+        r"""Simple method for saving only the checkpoint"""
+        if backbone_model is None:
+            backbone_model = self.backbone_model
+        save_func(backbone_model.state_dict(), f"{path}/{WEIGHTS_NAME}")
 
     @classmethod
     def from_finetuned(cls,

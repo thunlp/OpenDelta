@@ -22,10 +22,18 @@ class InterFaceMixin:
         self._reverse_axis_order = np.argsort(self._axis_order).tolist()
 
     def _transpose(self, tensor):
-        return tensor.permute(*self._axis_order)
+        if tensor.dim() == 3:
+            return tensor.permute(*self._axis_order)
+        else:
+            return tensor
+
+
 
     def _reverse_transpose(self, tensor):
-        return tensor.permute(*self._reverse_axis_order).contiguous()
+        if tensor.dim() == 3:
+            return tensor.permute(*self._reverse_axis_order).contiguous()
+        else:
+            return tensor
 
     def _convert_data_type(self, tensor):
         self._data_type_record = tensor.dtype
@@ -34,6 +42,8 @@ class InterFaceMixin:
 
     def _reverse_data_type(self, tensor):
         return tensor.to(self._data_type_record).to(self._device_record)
+
+
 
 
 

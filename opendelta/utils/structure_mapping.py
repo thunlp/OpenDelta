@@ -24,7 +24,7 @@ t5_mapping = {
                 }
             }
         },
-        "final_layer_norm": {"__name__":"layer_norm"},  
+        "final_layer_norm": {"__name__":"layer_norm"},
     },
     "decoder": {"__name__":"decoder",
         "embed_tokens": {"__name__":"embeddings"},
@@ -199,8 +199,14 @@ distilbert_mapping = {
     }
 }
 
+
+MAPPINGERROR_MSG = "We haven't provide common structure mapping for this backbone model." + \
+                " If it is a common enough PLM, please check whether it is wrapped by other wrapper model, e.g., XXXForSequenceClassification." +\
+                "Please manually add the "+\
+                "delta models by speicifying 'modified_modules' based on the visualization of model structure. Refer to `https://opendelta.readthedocs.io/en/latest/notes/faq.html` for detail."
+
 def transform(org_key, mapping, strict=True, warning=False, verbose=False):
-    
+
     chain = org_key.split(".")
     query = ""
     node = mapping
@@ -215,7 +221,7 @@ def transform(org_key, mapping, strict=True, warning=False, verbose=False):
                 if strict:
                     if warning:
                         print(f"'{org_key}' has no common mapping.")
-                    return 
+                    return
                 else:
                     new_chain.append(query)
             else:
@@ -226,19 +232,19 @@ def transform(org_key, mapping, strict=True, warning=False, verbose=False):
             new_chain.append(query)
             query = ""
         else:
-            query += "." 
+            query += "."
     if query!="":
         if strict:
             if warning:
                 print("A part of the orginial key hasn't been matched!")
-            return 
+            return
         else:
             new_chain.append(query.strip(".")) # tailing query
     new_key = ".".join(new_chain)
     if verbose:
         print(f"{org_key} => {new_key}")
     return new_key
-    
+
 
 
 
@@ -255,7 +261,7 @@ def mapping_for_SequenceClassification(mapping, type):
         mapping["classifier"] = {"__name__": "classifier"}
     elif type == "deberta":
         mapping.pop("lm_predictions.lm_head")
-        mapping["pooler"] = {"__name__": "classifier"} 
+        mapping["pooler"] = {"__name__": "classifier"}
         mapping["classifier"] = {"__name__": "classifier"}
     else:
         raise NotImplementedError
@@ -266,27 +272,28 @@ def mapping_for_ConditionalGeneration(mapping, type):
     if type == "t5":
         mapping["lm_head"] = {"__name__":"lm_head.proj"}
     else:
-        raise NotImplementedError
+        raise NotImplementedError(MAPPINGERROR_MSG.format())
     return mapping
 
 class _LazyLoading(OrderedDict):
     def __init__(self, mapping):
         self._mapping_string = mapping
         self._mapping = {}
-    
+
     def __getitem__(self, key):
         if key not in self._mapping_string:
-            raise KeyError(key)
+            raise KeyError(MAPPINGERROR_MSG)
         value = self._mapping_string[key]
         self._mapping[key] = eval(value)
-        return self._mapping[key] 
-    
+        return self._mapping[key]
+
     def keys(self):
         return list(self._mapping_string.keys())
-    
+
     def __contains__(self, item):
 
         return item in self._mapping_string
+
 
 
 class CommonStructureMap(object):
@@ -296,7 +303,6 @@ class CommonStructureMap(object):
         "RobertaForSequenceClassification": """mapping_for_SequenceClassification(roberta_mapping, "roberta")""",
         "RobertaForMaskedLM": "roberta_mapping",
         "BertForMaskedLM": "bert_mapping",
-        "BertForSequenceClassification": """mapping_for_SequenceClassification(bert_mapping, "bert")""",
         "T5ForConditionalGeneration": """mapping_for_ConditionalGeneration(t5_mapping, "t5")""",
         "DebertaV2ForSequenceClassification": """mapping_for_SequenceClassification(debertav2_mapping, "deberta")"""
     })
@@ -315,8 +321,17 @@ class CommonStructureMap(object):
         """
         backbone_class = type(backbone_model).__name__
         if backbone_class not in cls.Mappings:
-            raise KeyError(backbone_class)
-        mapping = cls.Mappings[backbone_class]
+            raise KeyError(MAPPINGERROR_MSG)
+
+        try:
+            mapping = cls.Mappings[backbone_class]
+        except KeyError:
+            logger.error(MAPPINGERROR_MSG)
+            exit(-1)
+
+
+
+
         if visualize:
             logger.info("Since you are using the common structure mapping, draw the transformed parameter structure for checking.")
             vis = Visualization(backbone_model)
@@ -346,4 +361,3 @@ if __name__ == "__main__":
 
     for name, _ in plm.named_modules():
         transform(name, t5_mapping, strict=True, warning=False)
-    
