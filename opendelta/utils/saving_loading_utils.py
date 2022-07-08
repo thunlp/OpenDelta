@@ -32,13 +32,9 @@ class DeltaCenterArguments:
     backbone_model: str = field(default="",
                                 metadata={"help": "The backbone model of the delta model"}
     )
-    model_path_public: str = field(
+    backbone_model_path_public: str = field(
         default = None,
         metadata={"help": "Publicly available path (url) to pretrained model or model identifier from huggingface.co/models"}
-    )
-    model_revision: str = field(
-        default="main",
-        metadata={"help": "The specific model version to use (can be a branch name, tag name or commit id)."},
     )
     delta_type: str = field(
         default=None,
@@ -48,6 +44,10 @@ class DeltaCenterArguments:
         default=None,
         metadata={"help": "the task(s） that the delta is trained on"}
     )
+    train_datasets: Optional[Union[List[str], str]]= field(
+        default=None,
+        metadata={"help": "the datasets(s） that the delta is trained on"}
+    )
     checkpoint_size: Optional[float] = field(
         default=None,
         metadata={"help": "the size of the checkpoint, in MB"}
@@ -55,6 +55,10 @@ class DeltaCenterArguments:
     test_tasks: Optional[Union[List[str], str]] = field(
         default=None,
         metadata={"help": "the task(s) that the delta is tested on"}
+    )
+    test_datasets: Optional[Union[List[str], str]] = field(
+        default=None,
+        metadata={"help": "the dataset(s) that the delta is tested on"}
     )
     test_performance: Optional[float] = field(
         default=None,
@@ -71,6 +75,14 @@ class DeltaCenterArguments:
     delta_ratio: Optional[float] = field(
         default=None,
         metadata={"help": "the ratio of delta parameters in the model"}
+    )
+    usage: Optional[str] = field(
+        default="",
+        metadata={"help": "the usage code of the model"}
+    )
+    license: Optional[str] = field(
+        default="apache-2.0",
+        metadata={"help": "the license of the model"}
     )
 
 
@@ -96,6 +108,7 @@ class SaveLoadMixin:
         list_tags: Optional[List] = list(),
         dict_tags: Optional[Dict] = dict(),
         delay_push: bool = False,
+        usage: Optional[str] = "",
     ):
         r"""
         Save a model and its configuration file to a directory, so that it can be re-loaded using the
@@ -353,16 +366,27 @@ class SaveLoadMixin:
             logger.info("Name is not set, use default name.")
             mdict['name'] = self.create_default_name(**mdict)
 
+        if len(mdict['usage']) == 0:
+            logger.info("Usage is not set, use default usage.")
+            mdict['usage'] = self.create_default_usage(mdict['name'])
+
 
         center_args = DeltaCenterArguments(**mdict)
         return  center_args
+
+    def create_default_usage(self, name):
+        usage_str = """from opendelta import AutoDeltaModel\n""" + \
+            """delta_model = AutoDeltaModel.from_finetuned('{name_with_userid}', backbone_model=model)\n""" + \
+            """delta_model.freeze_module() # if you are going to further train it \n""" + \
+            """delta_model.log()"""
+        return usage_str
 
     def create_default_name(self, **kwargs):
         r"""Currently, it's only a simple concatenation of the arguments.
         """
 
         reponame = ""
-        reponame += kwargs["model_path_public"].split("/")[-1]+"_" if kwargs['model_path_public'] is not None else kwargs['backbone_model']
+        reponame += kwargs["backbone_model_path_public"].split("/")[-1]+"_" if kwargs['backbone_model_path_public'] is not None else kwargs['backbone_model']
         reponame += kwargs["delta_type"]+"_" if kwargs["delta_type"] is not None else ""
 
         # tasks

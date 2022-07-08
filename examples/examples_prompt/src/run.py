@@ -324,7 +324,7 @@ def main():
     delta_model.save_finetuned(finetuned_delta_path=delta_args.finetuned_delta_path,
                                push_to_dc=training_args.push_to_dc,
                                center_args={"test_performance":all_results['test'][data_args.task_name]['test_average_metrics'],
-                                            },
+                                            "backbone_model_path_public":model_args.model_name_or_path.split("/")[-1]},
                                center_args_pool = {**vars(model_args), **vars(data_args), **vars(training_args), **vars(delta_args)},
                                list_tags = ['NLI'],
                                dict_tags = {'purpose':'for testing'},

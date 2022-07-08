@@ -8,4 +8,4 @@ decorator
 rich
 web.py
 gitpython
-delta_center_client
+delta_center_client==0.0.4

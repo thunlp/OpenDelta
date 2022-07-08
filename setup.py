@@ -14,7 +14,7 @@ decorator
 rich
 web.py
 gitpython
-delta_center_client
+delta_center_client==0.0.4
 """
 
 def get_requirements():
@@ -30,7 +30,7 @@ def get_requirements():
 with open('README.md', 'r') as f:
     setuptools.setup(
         name = 'opendelta',
-        version = "0.2.2",
+        version = "0.2.4",
         description = "An open source framework for delta learning (parameter efficient learning).",
         long_description=open("README.md", "r", encoding="utf-8").read(),
         long_description_content_type="text/markdown",
