@@ -26,14 +26,13 @@ def preprocess_function(raw_example, **kwargs):
     example = InputExample(**raw_example)
 
 
-    try:
-        example = verbalizer.wrap_one_example(example)
-        example, other = template.wrap_one_example(example)
-        input_sentence = tokenizer_wrapper.merge_wrapped_example(example)
-        model_inputs = tokenizer(input_sentence, max_length=data_args.max_source_length,
-                            padding="max_length", truncation=True)
-    except:
-        from IPython import embed; embed(header="Therer")
+   
+    example = verbalizer.wrap_one_example(example)
+    example, other = template.wrap_one_example(example)
+    input_sentence = tokenizer_wrapper.merge_wrapped_example(example)
+    model_inputs = tokenizer(input_sentence, max_length=data_args.max_source_length,
+                        padding="max_length", truncation=True)
+
 
     with tokenizer.as_target_tokenizer():
         label = tokenizer(other['tgt_text']).input_ids
