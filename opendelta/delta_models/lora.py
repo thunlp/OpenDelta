@@ -9,6 +9,10 @@ import torch.nn as nn
 from opendelta import BaseDeltaConfig
 import math
 
+class Identical(nn.Module):
+    def forward(self, x):
+        return x
+
 class LowRankLinear(nn.Module):
     #  ------------------------------------------------------------------------------------------
     #  Copyright (c) Microsoft Corporation. All rights reserved.
@@ -30,7 +34,7 @@ class LowRankLinear(nn.Module):
         if lora_dropout > 0.:
             self.lora_dropout = nn.Dropout(p=lora_dropout)
         else:
-            self.lora_dropout = lambda x: x
+            self.lora_dropout = Identical()
         if r > 0:
             self.lora_A = nn.Parameter(weight.new_zeros((r, in_features)))
             self.lora_B = nn.Parameter(weight.new_zeros((out_features, r)))
