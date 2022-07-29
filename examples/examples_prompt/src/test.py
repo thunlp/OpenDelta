@@ -152,9 +152,13 @@ def main():
     Visualization(model).structure_graph()
 
     if delta_args.delta_type.lower() != "none":
-        from opendelta import AutoDeltaConfig,AutoDeltaModel
-        # delta_config = AutoDeltaConfig.from_dict(vars(delta_args))
-        delta_model = AutoDeltaModel.from_finetuned(finetuned_model_path=delta_args.finetuned_model_path, cache_dir="saved_ckpts", backbone_model=model)
+        from opendelta.delta_models.adapter import AdapterConfig, AdapterModel
+        delta_config = AdapterConfig.from_finetuned(finetuned_delta_path=delta_args.finetuned_delta_path)
+        delta_model = AdapterModel.from_finetuned(finetuned_delta_path=delta_args.finetuned_delta_path,
+                    delta_config=delta_config,
+                    backbone_model=model,
+                    force_download=delta_args.force_download,
+                    cache_dir=delta_args.delta_cache_dir)
         # delta_model.freeze_module(set_state_dict = True)
         delta_model.log(delta_ratio=True, trainable_ratio=True, visualization=True)
 

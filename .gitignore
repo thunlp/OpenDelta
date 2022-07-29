@@ -51,3 +51,5 @@ t.py
 t.sh
 !examples/examples_prompt/configs/*/*.json
 !examples/examples_prompt/configs/**
+**/delta_checkpoints/
+**/outputs/

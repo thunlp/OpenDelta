@@ -13,10 +13,9 @@ import numpy as np
 import torch
 import re
 import itertools
-
+import os
 
 logger = logging.getLogger(__name__)
-
 
 
 from transformers.models.auto.tokenization_auto import tokenizer_class_from_name
@@ -63,7 +62,8 @@ class COLA(AbstractTask):
     }
 
     def load_dataset(self, split):
-        if self.data_args.datasets_load_from_disk:
+        offline = os.environ.get("HF_DATASETS_OFFLINE", "0")
+        if offline == '1':
             return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.cola")[split]
         else:
             return datasets.load_dataset('glue', 'cola',
@@ -91,7 +91,8 @@ class SST2(AbstractTask):
     }
 
     def load_dataset(self, split):
-        if self.data_args.datasets_load_from_disk:
+        offline = os.environ.get("HF_DATASETS_OFFLINE", "0")
+        if offline == '1':
             return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.sst2")[split]
         else:
             return datasets.load_dataset('glue', 'sst2',
@@ -118,10 +119,9 @@ class MRPC(AbstractTask):
     }
 
 
-
-
     def load_dataset(self, split):
-        if self.data_args.datasets_load_from_disk:
+        offline = os.environ.get("HF_DATASETS_OFFLINE", "0")
+        if offline == '1':
             return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.mrpc")[split]
         else:
             return datasets.load_dataset('glue', 'mrpc', split=split, script_version="master")
@@ -147,7 +147,8 @@ class QQP(AbstractTask):
 
 
     def load_dataset(self, split):
-        if self.data_args.datasets_load_from_disk:
+        offline = os.environ.get("HF_DATASETS_OFFLINE", "0")
+        if offline == '1':
             return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.qqp")[split]
         else:
             return datasets.load_dataset('glue', 'qqp',
@@ -203,7 +204,8 @@ class MNLI(AbstractTask):
     }
 
     def load_dataset(self, split):
-        if self.data_args.datasets_load_from_disk:
+        offline = os.environ.get("HF_DATASETS_OFFLINE", "0")
+        if offline == '1':
             return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.mnli")[split]
         else:
             return datasets.load_dataset('glue', 'mnli', split=split, script_version="master")
@@ -238,7 +240,8 @@ class QNLI(AbstractTask):
 
 
     def load_dataset(self, split):
-        if self.data_args.datasets_load_from_disk:
+        offline = os.environ.get("HF_DATASETS_OFFLINE", "0")
+        if offline == '1':
             return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.qnli")[split]
         else:
             return datasets.load_dataset('glue', 'qnli', split=split, script_version="master")
@@ -274,7 +277,8 @@ class RTE(AbstractTask):
     }
 
     def load_dataset(self, split):
-        if self.data_args.datasets_load_from_disk:
+        offline = os.environ.get("HF_DATASETS_OFFLINE", "0")
+        if offline == '1':
             return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.rte")[split]
         else:
             return datasets.load_dataset('glue', 'rte',
@@ -301,7 +305,8 @@ class WNLI(AbstractTask):
 
 
     def load_dataset(self, split):
-        if self.data_args.datasets_load_from_disk:
+        offline = os.environ.get("HF_DATASETS_OFFLINE", "0")
+        if offline == '1':
             return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/glue.wnli")[split]
         else:
             return datasets.load_dataset('glue', 'wnli', split=split, script_version="master")
@@ -329,7 +334,8 @@ class SuperGLUEBoolQ(AbstractTask):
     }
 
     def load_dataset(self, split):
-        if self.data_args.datasets_load_from_disk:
+        offline = os.environ.get("HF_DATASETS_OFFLINE", "0")
+        if offline == '1':
             return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/super_glue.boolq")[split]
         else:
             return datasets.load_dataset('super_glue', 'boolq', split=split, script_version="master")
@@ -342,7 +348,7 @@ class SuperGLUECB(AbstractTask):
     split_to_data_split = {"train": "train",
                            "validation": "validation",
                            "test": "validation"}
-    metric = [metrics.mean_multiclass_f1(num_classes=3), metrics.accuracy]
+    metric = [metrics.accuracy]
     metric_names = ["accuracy"]
 
     verbalizers = {
@@ -356,7 +362,8 @@ class SuperGLUECB(AbstractTask):
     }
 
     def load_dataset(self, split):
-        if self.data_args.datasets_load_from_disk:
+        offline = os.environ.get("HF_DATASETS_OFFLINE", "0")
+        if offline == '1':
             return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/super_glue.cb")[split]
         else:
             return datasets.load_dataset('super_glue', 'cb', split=split, script_version="master")
@@ -382,7 +389,8 @@ class SuperGLUECOPA(AbstractTask):
     }
 
     def load_dataset(self, split):
-        if self.data_args.datasets_load_from_disk:
+        offline = os.environ.get("HF_DATASETS_OFFLINE", "0")
+        if offline == '1':
             return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/super_glue.copa")[split]
         else:
             return datasets.load_dataset('super_glue', 'copa', split=split, script_version="master")
@@ -411,7 +419,8 @@ class SuperGLUEMultiRC(AbstractTask):
 
 
     def load_dataset(self, split):
-        if self.data_args.datasets_load_from_disk:
+        offline = os.environ.get("HF_DATASETS_OFFLINE", "0")
+        if offline == '1':
             return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/super_glue.multirc")[split]
         else:
             return datasets.load_dataset('super_glue', 'multirc', split=split, script_version="master")
@@ -454,7 +463,8 @@ class SuperGLUEWIC(AbstractTask):
     }
 
     def load_dataset(self, split):
-        if self.data_args.datasets_load_from_disk:
+        offline = os.environ.get("HF_DATASETS_OFFLINE", "0")
+        if offline == '1':
             return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/super_glue.wic")[split]
         else:
             return datasets.load_dataset('super_glue', 'wic', split=split, script_version="master")
@@ -544,7 +554,8 @@ class Beans(AbstractTask):
 
     def load_dataset(self, split):
         # from IPython import embed; embed(header="beans")
-        if self.data_args.datasets_load_from_disk:
+        offline = os.environ.get("HF_DATASETS_OFFLINE", "0")
+        if offline == '1':
             return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/beans")[split]
         else:
             return datasets.load_dataset('beans', split=split, script_version="master")

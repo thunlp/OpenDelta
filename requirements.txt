@@ -10,3 +10,4 @@ web.py
 gitpython
 scipy
 sklearn
+delta_center_client==0.0.4
