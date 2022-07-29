@@ -19,7 +19,10 @@ from transformers.file_utils import (
     )
 from transformers.utils.dummy_pt_objects import PreTrainedModel
 import hashlib
-from DeltaCenter import OssClient
+try:
+    from DeltaCenter import OssClient
+except:
+    pass
 import  yaml
 from dataclasses import dataclass, field, fields
 import datetime
@@ -107,6 +110,7 @@ class SaveLoadMixin(PushToHubMixin):
         list_tags: Optional[List] = None,
         dict_tags: Optional[Dict] = None,
         delay_push: bool = False,
+        test_result = None
     ):
         r"""
         Save a model and its configuration file to a directory, so that it can be re-loaded using the
@@ -174,8 +178,12 @@ class SaveLoadMixin(PushToHubMixin):
         final_center_args = self.create_delta_center_args(center_args=center_args,
                         center_args_pool=center_args_pool)
 
+        state_dict_total_params = sum(p.numel() for p in state_dict.values())
+        other_tags={}
+        other_tags.update({'state_dict_total_params(M)':state_dict_total_params/1024/1024})
+        other_tags.update({'test_result':test_result})
         if push_to_dc:
-            self.create_yml(save_directory, final_center_args, list_tags, dict_tags)
+            self.create_yml(save_directory, final_center_args, list_tags, dict_tags,other_tags)
 
         if not delay_push:
             OssClient.upload(base_dir=save_directory)
@@ -187,11 +195,13 @@ class SaveLoadMixin(PushToHubMixin):
         # get absolute path of saved_directory,
 
 
-    def create_yml(self, save_dir, config, list_tags=None, dict_tags=None):
+    def create_yml(self, save_dir, config, list_tags=None, dict_tags=None,other_tags=None):
         f = open("{}/config.yml".format(save_dir), 'w')
         config_dict = vars(config)
         config_dict['dict_tags'] = dict_tags if dict_tags is not None else {}
         config_dict['list_tags'] = list_tags if list_tags is not None else []
+        if other_tags is not None:
+            config_dict.update(other_tags)
         yaml.safe_dump(config_dict, f)
         f.close()
 

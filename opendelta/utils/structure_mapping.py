@@ -3,6 +3,29 @@ import copy
 import opendelta.utils.logging as logging
 from opendelta.utils.visualization import Visualization
 logger = logging.get_logger(__name__)
+opt_mapping = {
+    "model.decoder.embed_tokens": {"__name__":"embeddings"},
+    "model.decoder.embed_positions": {"__name__":""},
+    "model.decoder.project_out": {"__name__":""},
+    "model.decoder.project_in": {"__name__":""},
+    "model.decoder": {"__name__":"decoder",
+        "layer": {"__name__":"block",
+            "$": {"__name__":"$",
+                "self_attn": {"__name__":"attn",
+                    "q_proj": {"__name__":"q"},
+                    "k_proj": {"__name__":"k"},
+                    "v_proj": {"__name__":"v"},
+                    "out_proj": {"__name__":"proj"}
+                },
+                "self_attn_layer_norm": {"__name__":"layer_norm"},
+                "fc1": {"__name__":"ff.w1"},
+                "fc2": {"__name__":"ff.w2"},
+                "final_layer_norm": {"__name__":"layer_norm"},
+            }
+        }
+    }
+}
+
 t5_mapping = {
     "shared": {"__name__":"embeddings"},
     "encoder": {"__name__":"encoder",
@@ -269,6 +292,14 @@ def mapping_for_ConditionalGeneration(mapping, type):
         raise NotImplementedError
     return mapping
 
+def mapping_for_CausalLM(mapping, type):
+    mapping = copy.deepcopy(mapping)
+    if type == "opt":
+        mapping["lm_head"] = {"__name__":"lm_head.proj"}
+    else:
+        raise NotImplementedError
+    return mapping
+
 class _LazyLoading(OrderedDict):
     def __init__(self, mapping):
         self._mapping_string = mapping
@@ -298,7 +329,9 @@ class CommonStructureMap(object):
         "BertForMaskedLM": "bert_mapping",
         "BertForSequenceClassification": """mapping_for_SequenceClassification(bert_mapping, "bert")""",
         "T5ForConditionalGeneration": """mapping_for_ConditionalGeneration(t5_mapping, "t5")""",
-        "DebertaV2ForSequenceClassification": """mapping_for_SequenceClassification(debertav2_mapping, "deberta")"""
+        "DebertaV2ForSequenceClassification": """mapping_for_SequenceClassification(debertav2_mapping, "deberta")""",
+        "CLIPModel":"""""",
+        "OPTForCausalLM":"""mapping_for_CausalLM(opt_mapping,"opt")"""
     })
 
     SpecialModelInverseMaps = {
