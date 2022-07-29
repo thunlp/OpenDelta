@@ -2,7 +2,7 @@ import collections
 import copy
 
 PATHBASE="/mnt/sfs_turbo/hsd/plm_cache/"
-PATHBASE="/home/hushengding/plm_cache/"
+# PATHBASE="/home/hushengding/plm_cache/"
 
 AllConfigs = {}
 

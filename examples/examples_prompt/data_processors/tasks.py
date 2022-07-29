@@ -556,12 +556,74 @@ class Beans(AbstractTask):
         # from IPython import embed; embed(header="beans")
         offline = os.environ.get("HF_DATASETS_OFFLINE", "0")
         if offline == '1':
-            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/super_glue.wic")[split]
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/beans")[split]
         else:
             return datasets.load_dataset('beans', split=split, script_version="master")
 
+class Wikitext(AbstractTask):
+    #wikitext-2-v1
+    name = "wikitext"
+    # labels_list = ['angular_leaf_spot', 'bean_rust', "healthy"]
+    split_to_data_split = {"train": "train",
+                           "validation": "validation",
+                           "test": "validation"}
+    metric = [metrics.perplexity]
+    metric_names = ["perplexity"]
 
+    verbalizers = {
+        "0": {
+        }
+    }
 
+    templates_text = {
+        "0": """{"meta":"text"}"""
+    }
+    split_valid_to_make_test = True
+    def load_dataset(self, split):
+        # from IPython import embed; embed(header="beans")
+        if self.data_args.datasets_load_from_disk:
+            return datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/wikitext")[split]
+        else:
+            return datasets.load_dataset('wikitext','wikitext-2-v1', split=split, script_version="master")
+
+class Cifar10(AbstractTask):
+    name = "cifar10"
+
+    split_to_data_split = {"train": "train",
+                           "validation": "test",
+                           "test": "test"}
+    metric = [metrics.accuracy]
+    metric_names = ["accuracy"]
+
+    def load_dataset(self, split):
+        if self.data_args.datasets_load_from_disk:
+            d = datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/cifar10")[split].select(range(100))
+            print(d)
+            return d
+        else:
+            return datasets.load_dataset('cifar10', split=split, script_version="master")
+    # def preprocessor(self, example):
+    #     example_ = {}
+    #     example_["image"] = example["image"]
+    #     example_["labels"] = example["label"]
+
+    #     return example_
+class Fashion_MNIST(AbstractTask):
+    name = "Fashion-MNIST"
+
+    split_to_data_split = {"train": "train",
+                           "validation": "test",
+                           "test": "test"}
+    metric = [metrics.accuracy]
+    metric_names = ["accuracy"]
+
+    def load_dataset(self, split):
+        if self.data_args.datasets_load_from_disk:
+            d = datasets.load_from_disk(f"{self.data_args.datasets_saved_path}/fashion_mnist")[split]
+            print(d)
+            return d
+        else:
+            return datasets.load_dataset('fashion_mnist', split=split, script_version="master")
 
 TASK_MAPPING = OrderedDict(
     [
@@ -581,7 +643,10 @@ TASK_MAPPING = OrderedDict(
         ('superglue-multirc', SuperGLUEMultiRC),
         ('superglue-wic', SuperGLUEWIC),
         # ('superglue-record', SuperGLUERecord)
-        ('beans', Beans)
+        ('beans', Beans),
+        ('wikitext',Wikitext),
+        ('cifar10',Cifar10),
+        ('fashion_mnist',Fashion_MNIST)
     ]
 )
 

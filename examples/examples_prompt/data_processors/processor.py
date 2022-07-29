@@ -93,4 +93,10 @@ class AbstractTask(abc.ABC):
             # shuffles the data and samples it.
             if n_obs is not None:
                 dataset = self.subsample(dataset, n_obs)
-        return dataset.map(self.preprocessor)
+
+        this_method = getattr(self.__class__, 'preprocessor')
+        base_method = getattr(AbstractTask, 'preprocessor')
+        if this_method is not base_method:
+            return dataset.map(self.preprocessor)
+        else:
+            return dataset

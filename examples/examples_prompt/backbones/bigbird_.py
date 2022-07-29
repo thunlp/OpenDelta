@@ -1,45 +1,55 @@
-
 from openpromptu.data_utils import InputExample
-from transformers import Seq2SeqTrainer as HfSeq2SeqTrainer
+import torch
+from transformers.data.data_collator import torch_default_data_collator
+from transformers.data.data_collator import DataCollatorMixin as HfDataCollatorMixin
+from transformers.data.data_collator import DataCollatorForSeq2Seq as DataCollator
+import numpy as np
 from transformers import (
     AutoConfig,
-    BlenderbotForConditionalGeneration,
+    AutoModelForCausalLM,
     AutoTokenizer,
 )
-from transformers.data.data_collator import DataCollatorForSeq2Seq as DataCollator
-import torch
 
-def mask_token_func(tokenizer, ith_mask=0):
-    return ""
-
-def get_remove_columns(dataset_features):
-    return dataset_features
+from transformers import Seq2SeqTrainer as HfSeq2SeqTrainer
+import copy
+from torch.nn import CrossEntropyLoss
 
 def preprocess_function(raw_example, **kwargs):
-    # max_target_length += 1
     tokenizer = kwargs['tokenizer']
     data_args = kwargs['data_args']
     template = kwargs['template']
     verbalizer = kwargs['verbalizer']
     tokenizer_wrapper = kwargs['tokenizer_wrapper']
-    split = kwargs['split']
+
     example = InputExample(**raw_example)
-
-
-   
-    example = verbalizer.wrap_one_example(example)
+    # example = verbalizer.wrap_one_example(example)
     example, other = template.wrap_one_example(example)
     input_sentence = tokenizer_wrapper.merge_wrapped_example(example)
     model_inputs = tokenizer(input_sentence, max_length=data_args.max_source_length,
                         padding="max_length", truncation=True)
-
-
-    with tokenizer.as_target_tokenizer():
-        label = tokenizer(other['tgt_text']).input_ids
-
-    model_inputs["labels"] = label
-    # from IPython import embed; embed()
     return model_inputs
+    
+
+
+def compute_metrics(eval_preds, dataset_name, eval_metric):
+    pass
+
+def mask_token_func(tokenizer, ith_mask=0):
+    return tokenizer.pad_token
+
+def get_remove_columns(dataset_features):
+    # dataset_features.remove("label")
+    return dataset_features
+
+def get_prompts(task, tokenizer, data_args, template_id="0", verbalizer_id="0"):
+    from openpromptu.prompts import GenerationVerbalizer
+    from openpromptu.prompts import ManualTemplate
+    from openpromptu import TokenizerWrapper
+    template = ManualTemplate(text = task.templates_text[template_id])
+    verbalizer = GenerationVerbalizer(tokenizer=tokenizer, classes = None, label_words=None)
+    tokenizer_wrapper = TokenizerWrapper(max_seq_length=data_args.max_source_length, tokenizer=tokenizer, truncate_method="balanced", mask_token_func=mask_token_func)
+    return template, verbalizer, tokenizer_wrapper
+
 
 def get_backbone(model_args, **kwargs):
     config = AutoConfig.from_pretrained(
@@ -48,7 +58,7 @@ def get_backbone(model_args, **kwargs):
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    config.dropout_rate = 0.0
+    # config.dropout_rate = 0.0
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
         cache_dir=model_args.cache_dir,
@@ -58,7 +68,7 @@ def get_backbone(model_args, **kwargs):
     )
 
 
-    model = BlenderbotForConditionalGeneration.from_pretrained(
+    model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
@@ -66,18 +76,7 @@ def get_backbone(model_args, **kwargs):
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
         )
-    # from IPython import embed; embed()
     return config, tokenizer, model
-
-
-def get_prompts(task, tokenizer, data_args, template_id="blenderbot", verbalizer_id="blenderbot"):
-    from openpromptu.prompts import GenerationVerbalizer
-    from openpromptu.prompts import ManualTemplate
-    from openpromptu import TokenizerWrapper
-    template = ManualTemplate(text = task.templates_text[template_id])
-    verbalizer = GenerationVerbalizer(tokenizer=tokenizer, classes = task.labels_list, label_words=task.verbalizers[verbalizer_id])
-    tokenizer_wrapper = TokenizerWrapper(max_seq_length=data_args.max_source_length, tokenizer=tokenizer, truncate_method="balanced", mask_token_func=mask_token_func)
-    return template, verbalizer, tokenizer_wrapper
 
 class Trainer(HfSeq2SeqTrainer):
     def __init__(self, verbalizer=None, eval_task=None, **kwargs):
@@ -86,12 +85,17 @@ class Trainer(HfSeq2SeqTrainer):
         self.compute_metrics = self._compute_metrics
 
     def compute_loss(self, model, inputs, return_outputs=False):
-        # from IPython import embed; embed()
+
+        labels=copy.deepcopy(inputs['input_ids'])
+        # labels[labels==self.tokenizer.pad_token_id]=-100
         outputs = model(**inputs)
-        if return_outputs:
-            return (outputs.loss, outputs)
-        else:
-            return outputs.loss
+        logits = outputs.logits
+        shift_logits = logits[..., :-1, :].contiguous()
+        shift_labels = labels[..., 1:].contiguous()
+        loss_fct = CrossEntropyLoss(ignore_index=self.tokenizer.pad_token_id)
+        loss = loss_fct(shift_logits.view(-1, shift_logits.shape[-1]), shift_labels.long().view(-1))
+
+        return (loss, outputs) if return_outputs else loss
 
     def prediction_step(
         self,
@@ -125,57 +129,41 @@ class Trainer(HfSeq2SeqTrainer):
                 model, inputs, prediction_loss_only=prediction_loss_only, ignore_keys=ignore_keys
             )
 
-
-        has_labels = "labels" in inputs
         inputs = self._prepare_inputs(inputs)
-        gen_kwargs = {
-            "max_length": 10, # self._max_length if s is not None else self.model.config.max_length,
-            "num_beams": 1, #self._num_beams if self._num_beams is not None else self.model.config.num_beams,
-            "min_length": 1  # for blenderbot, generally we set it to be a large number. But in classification, we set it to 1
-        }
-        generated_tokens = self.model.generate(
-            inputs["input_ids"],
-            attention_mask=inputs["attention_mask"],
-            **gen_kwargs,
-        )
-        # in case the batch is shorter than max length, the output should be padded
-        if generated_tokens.shape[-1] < gen_kwargs["max_length"]:
-            generated_tokens = self._pad_tensors_to_max_len(generated_tokens, gen_kwargs["max_length"])
-
         with torch.no_grad():
-
+            labels=copy.deepcopy(inputs['input_ids'])
+            # labels[labels==self.tokenizer.pad_token_id]=-100
             outputs = model(**inputs)
-            if has_labels:
-                if self.label_smoother is not None:
-                    loss = self.label_smoother(outputs, inputs["labels"]).mean().detach()
-                else:
-                    loss = (outputs["loss"] if isinstance(outputs, dict) else outputs[0]).mean().detach()
-            else:
-                loss = None
-
-        if self.args.prediction_loss_only:
+            logits = outputs.logits
+            shift_logits = logits[..., :-1, :].contiguous()
+            shift_labels = labels[..., 1:].contiguous().long()
+            loss_fct = CrossEntropyLoss(ignore_index=self.tokenizer.pad_token_id)
+            loss = loss_fct(shift_logits.view(-1, shift_logits.shape[-1]), shift_labels.view(-1)).detach().cpu()
+            loss = torch.where(torch.isnan(loss), torch.full_like(loss, 0), loss)
+            
+        if prediction_loss_only:
             return (loss, None, None)
+        else:
+            # non pad label
+            shift_labels = shift_labels.view(-1).detach().cpu()
+            nonpad_idx = shift_labels!=self.tokenizer.pad_token_id
+            shift_labels = shift_labels[nonpad_idx]
+            # the probability at the corresponding position
+            shift_logits = shift_logits.view(-1, shift_logits.shape[-1])[nonpad_idx].detach().cpu()
+            target_position = torch.nn.functional.one_hot(shift_labels,shift_logits.shape[-1]).bool().to(shift_labels.device)
+            shift_logits = shift_logits.softmax(dim=-1)[target_position]
 
-        labels = inputs["labels"]
-        if labels.shape[-1] < gen_kwargs["max_length"]:
-            labels = self._pad_tensors_to_max_len(labels, gen_kwargs["max_length"])
 
-        # from IPython import embed; embed(header="In seqseqtrainer")
-        return (loss, generated_tokens, labels)
+            return (loss, shift_logits, shift_labels)
 
     def _compute_metrics(self, eval_preds):
-        # from IPython import embed; embed(header="In compute metrics")
+
         preds, labels = eval_preds
-        decoded_preds = self.tokenizer.batch_decode(preds, skip_special_tokens=True)
-        decoded_labels = self.tokenizer.batch_decode(labels, skip_special_tokens=True)
-        # post_processor = .get(data_args.dataset_name[0], tokenizer,
-        #                                     data_args.ignore_pad_token_for_loss)
-        # decoded_preds, decoded_labels = post_processor.process(preds, labels, data_info)
+
         result = {}
         for metric in self.eval_task.metric:
-            result.update(metric(decoded_preds, decoded_labels))
+            result.update(metric(preds, labels,ignore_index=self.tokenizer.pad_token_id))
 
         average_metric = sum(result.values())/len(result)
         result.update({"average_metrics":average_metric})
         return result
-
