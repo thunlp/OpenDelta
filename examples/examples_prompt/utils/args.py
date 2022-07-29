@@ -256,10 +256,57 @@ class AdapterArguments:
     bottleneck_dim: Optional[int] = field(
         default=24, metadata={"help": "the dimension of the bottleneck layer"}
     )
+@dataclass
+class LoRAArguments:
+    lora_r: Optional[int] = field(
+        default=8, metadata={"help": "the rank of the LoRA metrics."}
+    )
+@dataclass
+class PrefixArguments:
+    pass
+@dataclass
+class BitFitArguments:
+    pass
+@dataclass
+class SoftPromptArguments:
+    soft_token_num: Optional[int] = field(
+        default=100, metadata={"help": "the num of soft tokens."}
+    )
 
+@dataclass
+class CompacterArguments:
+    pass
+@dataclass
+class LowRankAdapterArguments:
+    pass
+
+# from opendelta.delta_models.adapter import AdapterConfig
+# from opendelta.delta_models.bitfit import BitFitConfig
+# from opendelta.delta_models.compacter import CompacterConfig
+# from opendelta.delta_models.lora import LoraArguments
+# from opendelta.delta_models.low_rank_adapter import LowRankAdapterConfig
+# from opendelta.delta_models.prefix import PrefixConfig
+# from opendelta.delta_models.soft_prompt import SoftPromptConfig
+# DELTAARGMAP = {
+#     "adapter": AdapterConfig,
+#     "lora":LoraArguments,
+#     "prefix":PrefixConfig,
+#     "bitfit":BitFitConfig,
+#     "soft_prompt":SoftPromptConfig,
+#     "compacter":CompacterConfig,
+#     "low_rank_adapter":LowRankAdapterConfig
+
+# }
 
 DELTAARGMAP = {
-    "adapter": AdapterArguments
+    "adapter": AdapterArguments,
+    "lora":LoRAArguments,
+    "prefix":PrefixArguments,
+    "bitfit":BitFitArguments,
+    "soft_prompt":SoftPromptArguments,
+    "compacter":CompacterArguments,
+    "low_rank_adapter":LowRankAdapterArguments
+
 }
 
 # TODO: add more specific delta arguments
@@ -310,13 +357,14 @@ class RemainArgHfArgumentParser(HfArgumentParser):
             for d in outputs:
                 if isinstance(d, DeltaArguments): # merge the specific delta arguments
                     d.merge_arguments(outputs[-1])
-            return *(outputs[:-1]), remain_args
+
+            return  [*(outputs[:-1]), remain_args]
         else:
             outputs = self.parse_args_into_dataclasses(args=data_list, return_remaining_strings=return_remaining_args)
             for d in outputs:
                 if isinstance(d, DeltaArguments):
                     d.merge_arguments(outputs[-1])
-            return (*(outputs[:-1]),)
+            return [*(outputs[:-1]),]
 
     def parse_args_into_dataclasses(
         self, args=None, return_remaining_strings=False, look_for_args_file=True, args_filename=None

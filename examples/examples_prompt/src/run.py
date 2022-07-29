@@ -31,6 +31,7 @@ os.environ['MKL_THREADING_LAYER'] = 'GNU'
 os.environ['MKL_SERVICE_FORCE_INTEL'] = '1'
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 sys.path.append(os.path.join(os.getcwd(), "../"))
+# sys.path.append(os.path.join(os.getcwd(), "/mnt/sfs_turbo/zhangzhen/OpenDelta"))
 sys.path.append(os.path.join(os.getcwd()))
 
 import functools
@@ -120,7 +121,8 @@ def main():
 
 
 
-    if os.path.basename(model_args.model_name_or_path).startswith("t5"):
+    if os.path.basename(model_args.model_name_or_path).startswith("t5") \
+        or os.path.basename(model_args.model_name_or_path).startswith("long-t5") :
         from examples_prompt.backbones.t5 import get_backbone, preprocess_function, mask_token_func, get_remove_columns, get_prompts
         from examples_prompt.backbones.t5 import Trainer, DataCollator
     elif  os.path.basename(model_args.model_name_or_path).startswith("blenderbot"):
@@ -128,7 +130,9 @@ def main():
         from examples_prompt.backbones.blenderbot import Trainer, DataCollator
     elif os.path.basename(model_args.model_name_or_path).startswith("roberta") \
         or os.path.basename(model_args.model_name_or_path).startswith("bert") \
-          or os.path.basename(model_args.model_name_or_path).startswith("albert") :
+          or os.path.basename(model_args.model_name_or_path).startswith("albert") \
+            or os.path.basename(model_args.model_name_or_path).startswith("xlm-roberta") \
+                or os.path.basename(model_args.model_name_or_path).startswith("deberta") :
         from examples_prompt.backbones.bert import get_backbone, preprocess_function, mask_token_func, get_remove_columns, get_prompts
         from examples_prompt.backbones.bert import Trainer, DataCollator
     elif os.path.basename(model_args.model_name_or_path).startswith("beit"):
@@ -143,6 +147,10 @@ def main():
     elif os.path.basename(model_args.model_name_or_path).startswith("clip"):
         from examples_prompt.backbones.clip import get_backbone, preprocess_function, mask_token_func, get_remove_columns, get_prompts
         from examples_prompt.backbones.clip import Trainer, DataCollator
+    elif os.path.basename(model_args.model_name_or_path).startswith("opt") \
+        or os.path.basename(model_args.model_name_or_path).startswith("gpt"):
+        from examples_prompt.backbones.opt import get_backbone, preprocess_function, mask_token_func, get_remove_columns, get_prompts
+        from examples_prompt.backbones.opt import Trainer, DataCollator
 
 
 
@@ -329,6 +337,7 @@ def main():
                                list_tags = ['NLI'],
                                dict_tags = {'purpose':'for testing'},
                                delay_push=True,
+                               test_result=all_results['test']
                             )
 
 

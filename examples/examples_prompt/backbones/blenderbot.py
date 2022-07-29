@@ -165,7 +165,7 @@ class Trainer(HfSeq2SeqTrainer):
         return (loss, generated_tokens, labels)
 
     def _compute_metrics(self, eval_preds):
-        from IPython import embed; embed(header="In compute metrics")
+        # from IPython import embed; embed(header="In compute metrics")
         preds, labels = eval_preds
         decoded_preds = self.tokenizer.batch_decode(preds, skip_special_tokens=True)
         decoded_labels = self.tokenizer.batch_decode(labels, skip_special_tokens=True)
