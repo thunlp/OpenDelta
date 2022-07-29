@@ -8,3 +8,5 @@ decorator
 rich
 web.py
 gitpython
+scipy
+sklearn

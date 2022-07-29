@@ -39,3 +39,15 @@ log.txt
 **/thunlp/
 **/saved_ckpts/
 
+
+DeltaCenter-Python-Client/
+backbone_structure
+delta_checkpoints
+gitop.sh
+load_dataset_and_model.ipynb
+load_model.py
+scripts
+t.py
+t.sh
+!examples/examples_prompt/configs/*/*.json
+!examples/examples_prompt/configs/**
