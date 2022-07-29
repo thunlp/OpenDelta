@@ -251,7 +251,7 @@ def mapping_for_SequenceClassification(mapping, type):
             "out_proj": {"__name__":"out_proj"}
         }
     elif type == "bert":
-        mapping.pop("lm_head")
+        mapping.pop("cls.predictions")
         mapping["classifier"] = {"__name__": "classifier"}
     elif type == "deberta":
         mapping.pop("lm_predictions.lm_head")
