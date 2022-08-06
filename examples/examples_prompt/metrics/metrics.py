@@ -11,6 +11,14 @@ import sklearn.metrics
 
 logger = getLogger(__name__)
 
+def perplexity(outputs, targets,ignore_index=-100):
+    """Computes the perplexity accuracy."""
+    
+    ce = -np.log(outputs).mean()
+    # ce = F.cross_entropy(torch.Tensor(outputs).view(-1, outputs.shape[-1]), torch.Tensor(targets).view(-1).long(),ignore_index=ignore_index)
+
+    return {"perplexity":float(np.exp(ce))}
+
 def accuracy(predictions, targets) -> dict:
     """Computes the average accuracy."""
     return {"accuracy": 100 * ((np.array(predictions) == np.array(targets)).mean())}
@@ -102,8 +110,8 @@ def f1_score(predictions, targets) -> dict:
     Returns:
       F1 score, where any prediction != 0 or 1 is counted as wrong.
     """
-    targets = targets.astype(np.int32)
-    predictions = predictions.astype(np.int32)
+    targets = np.array(targets).astype(np.int32)
+    predictions = np.array(predictions).astype(np.int32)
     return {"f1": 100 * sklearn.metrics.f1_score(targets, predictions)}
 
 # TODO: maybe gaurd against invalid values https://stackoverflow.com/questions/56865344/how-do-i-calculate-the-matthews-correlation-coefficient-in-tensorflow
