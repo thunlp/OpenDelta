@@ -17,6 +17,20 @@ def get_device(module : Union[nn.Module, nn.Parameter]):
         else:
             raise RuntimeError("The module is paralleled acrossed device, please get device in a inner module")
 
+def get_dtype(module : Union[nn.Module, nn.Parameter]):
+    if not (isinstance(module, nn.Module) \
+         or isinstance(module, nn.Parameter)):
+        raise RuntimeError("module is not a instance of torch.nn.Module")
+    if hasattr(module, 'dtype'):
+        return module.dtype
+    else:
+        params_dtypes = [p.dtype for p in module.parameters()]
+        if len(params_dtypes) == 0:
+            return None
+        elif len(set(params_dtypes))==1:
+            return params_dtypes[0]
+        else:
+            raise RuntimeError("The module has multiple dtype, please get device in a inner module")
 
 def move_dict_to_cuda(dict_of_tensor, device):
     for key in dict_of_tensor:

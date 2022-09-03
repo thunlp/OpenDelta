@@ -33,7 +33,7 @@ class LowRankLinear(torch.nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         W = self.W_left*self.W_right
-        output = torch.matmul(input=x, other=W)
+        output = torch.matmul(input=x.to(W.dtype), other=W).to(x.dtype)
         if self.bias:
             output += self.b
         return output

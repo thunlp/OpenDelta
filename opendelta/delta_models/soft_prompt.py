@@ -225,5 +225,10 @@ class SoftPromptModel(DeltaBase):
             init_range = self.init_range,
             device = module_device,
         )
+        try:
+            import bmtrain as bmt
+            soft_prompt_layer = bmt.BMTrainModelWrapper(soft_prompt_layer)
+        except:
+            pass
         self.delta_modules.append(soft_prompt_layer)
         return soft_prompt_layer

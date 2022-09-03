@@ -85,6 +85,11 @@ class AdapterLayer(nn.Module, InterFaceMixin):
         self.instantiated = True
         # initialize the weight, which is important for fast convergence and better performance.
         self.apply(self._init_weight)
+        try:
+            import bmtrain as bmt
+            self.modulelist = bmt.BMTrainModelWrapper(self.modulelist)
+        except:
+            pass
 
     def _init_weight(self, module):
         if isinstance(module, nn.Linear):
