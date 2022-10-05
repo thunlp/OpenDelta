@@ -329,6 +329,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
             module (:obj:`nn.Module`, *optional*, default to :obj:`None`): The backbone model.
 
         """
+        return
         if module is None:
             module = self.backbone_model
         device = get_device(module)
