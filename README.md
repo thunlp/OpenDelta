@@ -31,7 +31,8 @@ OpenDelta is a toolkit for parameter-efficient tuning methods (we dub it as *del
 - **A demo of using Opendelta to modify the PLM (E.g., BART).**
 ![How PLM changes using Delta-tuning](docs/source/imgs/demo.gif)
 
-## Updates
+## News
+- 2022.10.10 We merge new version into main. Key changes can be seen in [Update log]()
 - 2022.03.24 We notice several bugs in Soft Prompt Tuning and Prefix Tuning, mainly due to their need to customize attention ids, token_type_ids, we are fixing it! Currently, please use the other methods since they are stabler and better in performance. 
 - 2022.03.20 Add a [colab example](https://colab.research.google.com/drive/1uAhgAdc8Qr42UKYDlgUv0f7W1-gAFwGo?usp=sharing) to illustrate efficient training and space-saving multitask-serving.
 - 2022.03.20 A new pip version released.
@@ -72,7 +73,10 @@ python setup.py install
 python setup.py develop
 ```
 
-If you encounter network error using setup.py, please firstly install the dependencies via
+#### Tips
+- If you want to use mirror for installing the packages, please change the `index_url` in [setup.cfg](set.cfg)
+
+- If you encounter network error using setup.py, please firstly install the dependencies via
 ```shell
 pip install -r requirements.txt && python setup.py develop
 ```
@@ -111,4 +115,7 @@ used models that OpenDelta are sure to support.
 | CTRL           | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  |     |     |
 
 
+##  Update Log
+
+### version 0.3.0
 
