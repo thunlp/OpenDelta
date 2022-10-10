@@ -97,6 +97,7 @@ class LoraModel(DeltaBase):
     config_class = LoraConfig
     delta_type = "lora"
     default_modified_modules = ['attn.q', 'attn.v']
+    pass_pseudo_data = False
     def __init__(self,
                  backbone_model: nn.Module,
                  lora_r=8,
