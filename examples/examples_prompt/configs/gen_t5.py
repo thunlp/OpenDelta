@@ -45,11 +45,14 @@ BaseConfigs['t5-base'] = {
                 "greater_is_better": True,
                 "evaluation_strategy": "steps",
                 "overwrite_output_dir": True,
-                "push_to_hub": False,
-                "push_to_delta_center": True,
+                "push_to_hf": False,
+                "push_to_dc": True,
                 "save_strategy": "steps",
                 "datasets_load_from_disk": True,
-                "datasets_saved_path": "/mnt/sfs_turbo/hsd/huggingface_datasets/saved_to_disk/"
+                "datasets_saved_path": "/mnt/sfs_turbo/hsd/huggingface_datasets/saved_to_disk/",
+                "backbone_model": "t5", # use in delta center,
+                "model_path_public": "t5-base", # use in delta center,
+
             }
 
 AllConfigs['bitfit_t5-base'] = copy.deepcopy(BaseConfigs['t5-base'])

@@ -3,24 +3,34 @@ import setuptools
 import os
 import os
 
-def get_requirements(path):
-    print("path is :", path)
-    ret = []
 
-    with open(os.path.join(path, "requirements.txt"), encoding="utf-8") as freq:
-        for line in freq.readlines():
-            ret.append( line.strip() )
+requires = """torch>=1.8.0
+transformers>=4.10.0
+datasets==1.17.0
+sentencepiece>=0.1.96
+tqdm>=4.62.2
+# loralib
+decorator
+rich
+web.py
+gitpython
+delta_center_client==0.0.4
+"""
+
+def get_requirements():
+    ret = [x for x in requires.split("\n") if len(x)>0]
+    print("requirements:", ret)
     return ret
 
 
-path = os.path.dirname(os.path.abspath(__file__))
-requires =  get_requirements(path)
-print(requires)
+
+# path = os.path.dirname(os.path.abspath(__file__))
+# requires =  get_requirements(path)
 
 with open('README.md', 'r') as f:
     setuptools.setup(
         name = 'opendelta',
-        version = "0.1.0",
+        version = "0.2.4",
         description = "An open source framework for delta learning (parameter efficient learning).",
         long_description=open("README.md", "r", encoding="utf-8").read(),
         long_description_content_type="text/markdown",
@@ -30,10 +40,10 @@ with open('README.md', 'r') as f:
         url="https://github.com/thunlp/OpenDelta",
         keywords = ['PLM', 'Parameter-efficient-Learning', 'AI', 'NLP'],
         python_requires=">=3.6.0",
-        install_requires=requires,
+        install_requires=get_requirements(),
         package_dir={'opendelta':'opendelta'},
         package_data= {
-            'opendelta':["utils/interactive/templates/*.html"],
+            'opendelta':["utils/interactive/templates/*.html", 'requirments.txt'],
         },
         include_package_data=True,
         packages=setuptools.find_packages(),

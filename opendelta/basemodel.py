@@ -671,21 +671,46 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         if visualization:
             from opendelta import Visualization
             Visualization(module).structure_graph()
+
+        self.get_statistics(module)
         if trainable_ratio:
-            n_trainable = self.num_trainable_parameters(module)
-            n_total = self.num_total_parameters(module)
-            logger.info("Trainable Ratio: {:2f}%".format(n_trainable/n_total*100))
+            logger.info("Trainable Ratio: {:2f}%".format(self.stat['trainable_ratio']*100))
         if delta_ratio:
-            n_delta = self.num_delta_parameters(module)
-            n_total = self.num_total_parameters(module)
-            logger.info("Delta Parameter Ratio: {:2f}%".format(n_delta/n_total*100))
+            logger.info("Delta Parameter Ratio: {:2f}%".format(self.stat['delta_ratio']*100))
         if cuda_memory:
-            cudamem = 0
-            maxcudamem = 0
-            for device_id in range(torch.cuda.device_count()):
-                cudamem += torch.cuda.memory_allocated(f"cuda:{device_id}")/1024**3
-                maxcudamem += torch.cuda.max_memory_allocated(f"cuda:{device_id}")/1024**3
-            logger.info("Static Memory {:.2f} GB, Max Memory {:.2f} GB".format(cudamem, maxcudamem))
+            logger.info("Static Memory {:.2f} GB, Max Memory {:.2f} GB".format(self.stat['cudamem'], self.stat['maxcudamem']))
+
+
+    def get_statistics(self, module=None):
+        r"""Get the statistics of the parameters in the delta modules.
+
+        Args:
+            module (:obj:`nn.Module`, *optional*): The module to compute the statistics.
+
+        Returns:
+            :obj:`dict`: The statistics of the parameters in the delta modules.
+
+        """
+        if module is None:
+            module = self.backbone_model
+
+        self.stat = {}
+        n_trainable = self.num_trainable_parameters(module)
+        n_total = self.num_total_parameters(module)
+
+        self.stat['trainable_ratio'] = n_trainable/n_total
+
+        n_delta = self.num_delta_parameters(module)
+        n_total = self.num_total_parameters(module)
+        self.stat['delta_ratio'] = n_delta/n_total
+
+        cudamem = 0
+        maxcudamem = 0
+        for device_id in range(torch.cuda.device_count()):
+            cudamem += torch.cuda.memory_allocated(f"cuda:{device_id}")/1024**3
+            maxcudamem += torch.cuda.max_memory_allocated(f"cuda:{device_id}")/1024**3
+        self.stat['cudamem'] = cudamem
+        self.stat['maxcudamem'] = maxcudamem
 
 
 

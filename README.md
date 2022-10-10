@@ -72,6 +72,11 @@ python setup.py install
 python setup.py develop
 ```
 
+If you encounter network error using setup.py, please firstly install the dependencies via
+```shell
+pip install -r requirements.txt && python setup.py develop
+```
+
 ## Must Try
 
 ```python

@@ -11,6 +11,8 @@ from opendelta import BaseDeltaConfig
 import opendelta.utils.logging as logging
 import numpy as np
 from opendelta import global_setting
+from dataclasses import dataclass, field
+
 logger = logging.get_logger(__name__)
 
 
@@ -20,10 +22,18 @@ class InterFaceMixin:
         self._reverse_axis_order = np.argsort(self._axis_order).tolist()
 
     def _transpose(self, tensor):
-        return tensor.permute(*self._axis_order)
+        if tensor.dim() == 3:
+            return tensor.permute(*self._axis_order)
+        else:
+            return tensor
+
+
 
     def _reverse_transpose(self, tensor):
-        return tensor.permute(*self._reverse_axis_order).contiguous()
+        if tensor.dim() == 3:
+            return tensor.permute(*self._reverse_axis_order).contiguous()
+        else:
+            return tensor
 
     def _convert_data_type(self, tensor):
         self._data_type_record = tensor.dtype
@@ -32,6 +42,8 @@ class InterFaceMixin:
 
     def _reverse_data_type(self, tensor):
         return tensor.to(self._data_type_record).to(self._device_record)
+
+
 
 
 
@@ -139,7 +151,7 @@ class AdapterConfig(BaseDeltaConfig):
         self,
         bottleneck_dim: Optional[int]=24,
         non_linearity: Optional[str]='gelu_new',
-        sequential: Optional[str] = True,
+        sequential: Optional[bool] = True,
         **kwargs
     ):
         super().__init__(**kwargs)

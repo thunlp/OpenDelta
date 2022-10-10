@@ -11,6 +11,14 @@ import sklearn.metrics
 
 logger = getLogger(__name__)
 
+def perplexity(outputs, targets,ignore_index=-100):
+    """Computes the perplexity accuracy."""
+    
+    ce = -np.log(outputs).mean()
+    # ce = F.cross_entropy(torch.Tensor(outputs).view(-1, outputs.shape[-1]), torch.Tensor(targets).view(-1).long(),ignore_index=ignore_index)
+
+    return {"perplexity":float(np.exp(ce))}
+
 def accuracy(predictions, targets) -> dict:
     """Computes the average accuracy."""
     return {"accuracy": 100 * ((np.array(predictions) == np.array(targets)).mean())}
@@ -47,20 +55,20 @@ def spearman_corrcoef(predictions, targets) -> dict:
 
 
 
-def spearman_corrcoef(predictions, targets) -> dict:
-    """Computes Spearman correlation coefficient."""
-    # TODO: we need to do postprocessors in a clean way for each dataset.
-    from examples_seq2seq.data_processors.postprocessors import string_to_float
-    targets = [string_to_float(target) for target in targets]
-    predictions= [string_to_float(prediction) for prediction in predictions]
-    spearman_corrcoef = 100 * scipy.stats.spearmanr(targets, predictions)[0]
+# def spearman_corrcoef(predictions, targets) -> dict:
+#     """Computes Spearman correlation coefficient."""
+#     # TODO: we need to do postprocessors in a clean way for each dataset.
+#     from examples_seq2seq.data_processors.postprocessors import string_to_float
+#     targets = [string_to_float(target) for target in targets]
+#     predictions= [string_to_float(prediction) for prediction in predictions]
+#     spearman_corrcoef = 100 * scipy.stats.spearmanr(targets, predictions)[0]
 
-    # Note that if all the predictions will be the same, spearman
-    # correlation is nan, to gaurad against this, we check the output
-    # and return 0 in this case.
-    if math.isnan(spearman_corrcoef):
-        spearman_corrcoef = 0
-    return {"spearmanr": spearman_corrcoef}
+#     # Note that if all the predictions will be the same, spearman
+#     # correlation is nan, to gaurad against this, we check the output
+#     # and return 0 in this case.
+#     if math.isnan(spearman_corrcoef):
+#         spearman_corrcoef = 0
+#     return {"spearmanr": spearman_corrcoef}
 
 
 def f1_score_with_invalid(predictions, targets) -> dict:
@@ -102,8 +110,8 @@ def f1_score(predictions, targets) -> dict:
     Returns:
       F1 score, where any prediction != 0 or 1 is counted as wrong.
     """
-    targets = targets.astype(np.int32)
-    predictions = predictions.astype(np.int32)
+    targets = np.array(targets).astype(np.int32)
+    predictions = np.array(predictions).astype(np.int32)
     return {"f1": 100 * sklearn.metrics.f1_score(targets, predictions)}
 
 # TODO: maybe gaurd against invalid values https://stackoverflow.com/questions/56865344/how-do-i-calculate-the-matthews-correlation-coefficient-in-tensorflow

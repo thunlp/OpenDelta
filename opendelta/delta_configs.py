@@ -5,15 +5,6 @@ from  opendelta import __version__ as opendelta_version
 from opendelta.utils import logging
 from opendelta.utils.signature import get_arg_names, get_arg_names_inside_func
 import transformers
-from transformers.file_utils import (
-    PushToHubMixin,
-    is_offline_mode,
-    cached_path,
-    is_remote_url,
-    get_list_of_files,
-    hf_bucket_url,
-)
-from packaging import version
 import json
 import copy
 
@@ -26,7 +17,7 @@ logger = logging.get_logger(__name__)
 FULL_CONFIGURATION_FILE = "config.json"
 _re_configuration_file = re.compile(r"config\.(.*)\.json")
 
-class BaseDeltaConfig(PushToHubMixin):
+class BaseDeltaConfig:
     r"""Base class for all configuration classes. Handles a few
     parameters common to all delta models' configurations as well as methods for loading/downloading/saving configurations.
 
@@ -108,7 +99,7 @@ class BaseDeltaConfig(PushToHubMixin):
 
 
     @classmethod
-    def from_finetuned(cls, finetuned_model_name_or_path: Union[str, os.PathLike], **kwargs) -> "BaseDeltaConfig":
+    def from_finetuned(cls, finetuned_delta_path: Union[str, os.PathLike], **kwargs) -> "BaseDeltaConfig":
         r"""
         Instantiate a :obj:`BaseDeltaConfig` (or a derived class) from a finetined delta module configuration.
 
@@ -132,7 +123,7 @@ class BaseDeltaConfig(PushToHubMixin):
             delta_config = LoraConfig.from_finetuned("DeltaHub/lora_t5-base_mrpc")
 
         """
-        config_dict, kwargs = cls.get_config_dict(finetuned_model_name_or_path, **kwargs)
+        config_dict, kwargs = cls.get_config_dict(finetuned_delta_path, **kwargs)
         if "model_type" in config_dict and hasattr(cls, "model_type") and config_dict["model_type"] != cls.model_type:
             logger.warn(
                 f"You are using a model of type {config_dict['model_type']} to instantiate a model of type "
@@ -202,6 +193,7 @@ class BaseDeltaConfig(PushToHubMixin):
                 config_dict.pop(config_key)
                 unused_config_keys.append(config_key)
         logger.warning(f"The following keys are not used by {cls}.__init__ function: {unused_config_keys}")
+
         config = cls(**config_dict)
 
 
@@ -215,7 +207,7 @@ class BaseDeltaConfig(PushToHubMixin):
                     to_remove.append(key)
         for key in to_remove:
             kwargs.pop(key, None)
-        logger.info(f"Model config {config}")
+        logger.info(f"Model config\n{config}")
 
         if return_unused_kwargs:
             return config, kwargs
@@ -224,96 +216,58 @@ class BaseDeltaConfig(PushToHubMixin):
 
     @classmethod
     def get_config_dict(
-        cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs
+        cls, finetuned_delta_path: Union[str, os.PathLike], **kwargs
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """[NODOC]
-        From a ``pretrained_model_name_or_path``, resolve to a dictionary of parameters, to be used for instantiating a
+        From a ``finetuned_delta_path``, resolve to a dictionary of parameters, to be used for instantiating a
         [``PretrainedConfig``] using ``from_dict``.
         Parameters:
-            pretrained_model_name_or_path (:obj:`str` or :obj:`os.PathLike`):
+            finetuned_delta_path (:obj:`str` or :obj:`os.PathLike`):
                 The identifier of the pre-trained checkpoint from which we want the dictionary of parameters.
         Returns:
             :obj:`Tuple[Dict, Dict]`: The dictionary(ies) that will be used to instantiate the configuration object.
         """
-        cache_dir = kwargs.pop("cache_dir", None)
-        force_download = kwargs.pop("force_download", False)
-        resume_download = kwargs.pop("resume_download", False)
-        proxies = kwargs.pop("proxies", None)
-        use_auth_token = kwargs.pop("use_auth_token", None)
-        local_files_only = kwargs.pop("local_files_only", False)
-        revision = kwargs.pop("revision", None)
+        cache_dir = kwargs.get("cache_dir", None)
+        force_download = kwargs.get("force_download", False)
+        # resume_download = kwargs.pop("resume_download", False)
+        # proxies = kwargs.pop("proxies", None)
+        # use_auth_token = kwargs.pop("use_auth_token", None)
+        local_files_only = kwargs.get("local_files_only", False)
+        # revision = kwargs.pop("revision", None)
         # from_pipeline = kwargs.pop("_from_pipeline", None)
-        from_auto_class = kwargs.pop("_from_auto", False)
+        # from_auto_class = kwargs.pop("_from_auto", False)
 
-        user_agent = {"file_type": "config", "from_auto_class": from_auto_class}
+        # user_agent = {"file_type": "config", "from_auto_class": from_auto_class}
         # if from_pipeline is not None:
             # user_agent["using_pipeline"] = from_pipeline
 
-        if is_offline_mode() and not local_files_only:
-            logger.info("Offline mode: forcing local_files_only=True")
+        if os.environ.get("DELTACENTER_OFFLINE", '0') == '1':
+            logger.info("Delta Center offline mode!")
             local_files_only = True
 
-        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
-        if os.path.isfile(pretrained_model_name_or_path) or is_remote_url(pretrained_model_name_or_path):
-            config_file = pretrained_model_name_or_path
+        finetuned_delta_path = str(finetuned_delta_path)
+
+        if cache_dir is not None:
+            cached_finetuned_delta_path = os.path.join(cache_dir, finetuned_delta_path)
         else:
-            configuration_file = get_configuration_file(
-                pretrained_model_name_or_path,
-                revision=revision,
-                use_auth_token=use_auth_token,
-                local_files_only=local_files_only,
-            )
+            cached_finetuned_delta_path = finetuned_delta_path
 
+        if os.path.isfile(cached_finetuned_delta_path):
+            local_files_only = True
+        elif os.path.isdir(cached_finetuned_delta_path):
+            # cached_finetuned_delta_path = os.path.join(cached_finetuned_delta_path, 'config.json')
+            local_files_only = True
 
-            if os.path.isdir(pretrained_model_name_or_path):
-                config_file = os.path.join(pretrained_model_name_or_path, configuration_file)
-            else:
-                config_file = hf_bucket_url(
-                    pretrained_model_name_or_path, filename=configuration_file, revision=revision, mirror=None
-                )
+        # if local_files_only:
+        #     config_dict = cls._dict_from_json_file(cached_finetuned_delta_path)
+        if not local_files_only or force_download:
+            from .utils.delta_center import download as dcdownload
+            # try to download from DeltaCenter
+            cached_finetuned_delta_path = dcdownload(finetuned_delta_path, force_download=force_download, cache_dir=cache_dir)
+            kwargs['force_download'] = False # Has been downloaded, not more forcing
 
-        try:
-            # Load from URL or cache if already cached
-            resolved_config_file = cached_path(
-                config_file,
-                cache_dir=cache_dir,
-                force_download=force_download,
-                proxies=proxies,
-                resume_download=resume_download,
-                local_files_only=local_files_only,
-                use_auth_token=use_auth_token,
-                user_agent=user_agent,
-            )
-            # Load config dict
-            config_dict = cls._dict_from_json_file(resolved_config_file)
-
-        except EnvironmentError as err:
-            logger.error(err)
-            msg = (
-                f"Can't load config for '{pretrained_model_name_or_path}'. Make sure that:\n\n"
-                f"- '{pretrained_model_name_or_path}' is a correct model identifier listed on 'https://huggingface.co/models'\n"
-                f"  (make sure '{pretrained_model_name_or_path}' is not a path to a local directory with something else, in that case)\n\n"
-                f"- or '{pretrained_model_name_or_path}' is the correct path to a directory containing a {CONFIG_NAME} file\n\n"
-            )
-
-            if revision is not None:
-                msg += f"- or '{revision}' is a valid git identifier (branch name, a tag name, or a commit id) that exists for this model name as listed on its model page on 'https://huggingface.co/models'\n\n"
-
-            raise EnvironmentError(msg)
-
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            msg = (
-                f"Couldn't reach server at '{config_file}' to download configuration file or "
-                "configuration file is not a valid JSON file. "
-                f"Please check network or file content here: {resolved_config_file}."
-            )
-            raise EnvironmentError(msg)
-
-        if resolved_config_file == config_file:
-            logger.info(f"loading configuration file {config_file}")
-        else:
-            logger.info(f"loading configuration file {config_file} from cache at {resolved_config_file}")
-
+        cached_finetuned_delta_path = os.path.join(cached_finetuned_delta_path, 'config.json')
+        config_dict = cls._dict_from_json_file(cached_finetuned_delta_path)
         return config_dict, kwargs
 
     @classmethod
@@ -425,53 +379,6 @@ class BaseDeltaConfig(PushToHubMixin):
             d["torch_dtype"] = str(d["torch_dtype"]).split(".")[1]
 
 
-
-
-def get_configuration_file(
-    path_or_repo: Union[str, os.PathLike],
-    revision: Optional[str] = None,
-    use_auth_token: Optional[Union[bool, str]] = None,
-    local_files_only: bool = False,
-) -> str:
-    """
-    Get the configuration file to use for this version of transformers.
-    Args:
-        path_or_repo (`:obj:str` or `:obj:os.PathLike`):
-            Can be either the id of a repo on huggingface.co or a path to a *directory*.
-        revision(`:obj:str`, *optional*, defaults to ``"main"``):
-            The specific model version to use. It can be a branch name, a tag name, or a commit id, since we use a
-            git-based system for storing models and other artifacts on huggingface.co, so ``revision`` can be any
-            identifier allowed by git.
-        use_auth_token (:obj:`str` or *bool*, *optional*):
-            The token to use as HTTP bearer authorization for remote files. If :obj:`True`, will use the token generated
-            when running ``transformers-cli login`` (stored in ``~/.huggingface``).
-        local_files_only (:obj:`bool`, *optional*, defaults to :obj:`False`):
-            Whether or not to only rely on local files and not to attempt to download any files.
-    Returns:
-        :obj:`str`: The configuration file to use.
-    """
-    # Inspect all files from the repo/folder.
-    all_files = get_list_of_files(
-        path_or_repo, revision=revision, use_auth_token=use_auth_token, local_files_only=local_files_only
-    )
-    configuration_files_map = {}
-    for file_name in all_files:
-        search = _re_configuration_file.search(file_name)
-        if search is not None:
-            v = search.groups()[0]
-            configuration_files_map[v] = os.path.split(file_name)[-1]
-    available_versions = sorted(configuration_files_map.keys())
-    # Defaults to FULL_CONFIGURATION_FILE and then try to look at some newer versions.
-    configuration_file = FULL_CONFIGURATION_FILE
-    # transformers_version_ = version.parse(transformers_version)
-    for v in available_versions:
-        # if version.parse(v) <= transformers_version_:
-        configuration_file = configuration_files_map[v]
-        # else:
-        #     # No point going further since the versions are sorted.
-        #     break
-
-    return configuration_file
 
 
 if __name__ == "__main__":

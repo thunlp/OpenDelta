@@ -8,7 +8,6 @@ from transformers import (
     AutoFeatureExtractor,
     AutoModelForImageClassification,
 )
-from transformers import ViTFeatureExtractor
 
 from transformers import Trainer as HfTrainer
 import torch.nn as nn
@@ -26,9 +25,10 @@ def get_prompts(task, tokenizer, data_args, template_id="0", verbalizer_id="0"):
 def preprocess_function(raw_example, **kwargs):
     # from IPython import embed; embed(header="Therefa")
     tokenizer = kwargs['tokenizer']
-    model_inputs = tokenizer(raw_example['image'], return_tensors='pt')
+    # print(np.array(raw_example['img']).shape)
+    model_inputs = tokenizer(np.array(raw_example['image']), return_tensors='pt')
     model_inputs['pixel_values'] = model_inputs['pixel_values'].squeeze()
-    model_inputs['labels'] = raw_example['labels']
+    model_inputs['labels'] = raw_example['label']
     return model_inputs
 
 def compute_metrics(eval_preds, dataset_name, eval_metric):
@@ -55,7 +55,7 @@ def mask_token_func(tokenizer, ith_mask=0):
 
 def get_remove_columns(dataset_features):
     # dataset_features.pop("label")
-    print("remove_columns: {}".format(dataset_features))
+    # print("remove_columns: {}".format(dataset_features))
     return dataset_features
 
 class DataCollator(HfDataCollatorMixin):
