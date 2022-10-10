@@ -107,7 +107,7 @@ class hello:
 class submit:
     def GET(self, _):
         global names
-        names = [name.strip("root.") for name in web.input().name.split(";")]
+        names = [name[5:] for name in web.input(name=[]).name]
         app.stop()
 
 def interactive(model, port=8888):
@@ -120,7 +120,7 @@ def interactive(model, port=8888):
     print("If on your machine, open the link below for interactive modification.\n "
     "If on remote host, you could use port mapping, "
     "or run in vscode terminal, which automatically do port mapping for you.")
-    app.run()
+    app.run(port)
     global names
     print("modified_modules:")
     print(names)
