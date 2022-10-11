@@ -515,7 +515,7 @@ class PrefixModel(DeltaBase):
     """
     config_class = PrefixConfig
     delta_type = "prefix"
-    default_modified_modules = ['attn']
+    default_modified_modules = ['attn@']
     def __init__(self,
                  backbone_model: nn.Module,
                  prefix_token_num=6,

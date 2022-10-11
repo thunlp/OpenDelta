@@ -53,3 +53,6 @@ t.sh
 !examples/examples_prompt/configs/**
 **/delta_checkpoints/
 **/outputs/
+
+
+unittest/outputs/

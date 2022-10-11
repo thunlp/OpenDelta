@@ -105,7 +105,8 @@ class BitFitModel(DeltaBase):
 
     config_class = BitFitConfig
     delta_type = "bitfit"
-    default_modified_modules = ["attn", "ff", "layer_norm","lm_head.proj"] # modify all the bias parameter in attention and feed-forward layer.
+    default_modified_modules = ["attn@", "ff@", "layer_norm@","lm_head@.proj@"] # modify all the bias parameter in attention and feed-forward layer.
+    _need_pseudo_data = False
     def __init__(self,
                  backbone_model: nn.Module,
                  modified_modules: Optional[List[str]] = None,
@@ -153,7 +154,7 @@ class BitFitModel(DeltaBase):
         else:
             # for the non-leaf modules, by default it will add bias only to the linear submodules.
             for n, c in module.named_modules():
-                if isinstance(c, nn.Linear):
+                if isinstance(c, nn.Linear) or isinstance(c, nn.LayerNorm):
                     if c.bias is None:
                         bias = nn.Parameter(torch.empty(c.out_features), requires_grad=True)
                         c.register_parameter('bias', bias)

@@ -147,7 +147,7 @@ class LowRankAdapterModel(DeltaBase):
 
     config_class = LowRankAdapterConfig
     delta_type = "low_rank_adapter"
-    default_modified_modules = ['attn', 'ff']
+    default_modified_modules = ['attn@', 'ff@']
     def __init__(self,
                  backbone_model: nn.Module,
                  reduction_factor = 32,

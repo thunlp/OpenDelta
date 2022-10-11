@@ -194,7 +194,7 @@ class AdapterModel(DeltaBase):
     """
     config_class = AdapterConfig
     delta_type = "adapter"
-    default_modified_modules = ["attn", "ff"]
+    default_modified_modules = ["attn@", "ff@"]
     def __init__(self,
                  backbone_model: nn.Module,
                  bottleneck_dim: Optional[int]=24,

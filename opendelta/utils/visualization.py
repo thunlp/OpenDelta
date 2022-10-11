@@ -86,7 +86,6 @@ class Visualization(object):
 
     """
     def __init__(self, plm: nn.Module):
-
         self.plm = plm
         self.type_color = "green"
         self.param_color = "cyan"

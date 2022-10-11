@@ -135,13 +135,37 @@ bert_mapping = {
             }
         }
     },
-    "cls.predictions": {"__name__": "lm_head",
-        "transform.dense": {"__name__":""},
-        "transform.LayerNorm": {"__name__":""},
-        "decoder": {"__name__":"proj"},
-    }
+    # "cls.predictions": {"__name__": "lm_head",
+    #     "transform.dense": {"__name__":""},
+    #     "transform.LayerNorm": {"__name__":""},
+    #     "decoder": {"__name__":"proj"},
+    # }
 }
 
+bert_model_mapping = {
+    "bert.embeddings.word_embeddings": {"__name__":"embeddings"},
+    "bert.embeddings.position_embeddings": {"__name__":""},
+    "bert.embeddings.token_type_embeddings": {"__name__":""},
+    "bert.embeddings.LayerNorm": {"__name__":""},
+    "bert.encoder": {"__name__":"encoder",
+        "layer": {"__name__":"block",
+            "$": {"__name__":"$",
+                "attention": {"__name__":"attn",
+                    "self.query": {"__name__":"q"},
+                    "self.key": {"__name__":"k"},
+                    "self.value": {"__name__":"v"},
+                    "output.dense": {"__name__":"proj"},
+                    "output.LayerNorm": {"__name__":"layer_norm"},
+                },
+                "output": {"__name__":"ff",
+                            "dense": {"__name__":"w2"},
+                            "LayerNorm": {"__name__":"layer_norm"}
+                },
+                "intermediate.dense": {"__name__":"ff.w1"},
+            }
+        }
+    },
+}
 
 debertav2_mapping = {
     "deberta.embeddings.word_embeddings": {"__name__":"embeddings"},
@@ -224,10 +248,37 @@ distilbert_mapping = {
 }
 
 
-MAPPINGERROR_MSG = "We haven't provide common structure mapping for this backbone model." + \
-                " If it is a common enough PLM, please check whether it is wrapped by other wrapper model, e.g., XXXForSequenceClassification." +\
-                "Please manually add the "+\
-                "delta models by speicifying 'modified_modules' based on the visualization of model structure. Refer to `https://opendelta.readthedocs.io/en/latest/notes/faq.html` for detail."
+MAPPINGERROR_MSG = "We haven't provide common structure mapping for this     backbone model or any of its inner modules. Please manually add the delta models by speicifying 'modified_modules' based on the visualization of model structure. Refer to `https://opendelta.readthedocs.io/en/latest/notes/faq.html` for detail."
+
+CoreMappings = {}
+
+CoreMappings['BertModel'] = {
+    "embeddings.word_embeddings": {"__name__":"embeddings"},
+    "embeddings.position_embeddings": {"__name__":""},
+    "embeddings.token_type_embeddings": {"__name__":""},
+    "embeddings.LayerNorm": {"__name__":""},
+    "encoder": {"__name__":"encoder",
+        "layer": {"__name__":"block",
+            "$": {"__name__":"$",
+                "attention": {"__name__":"attn",
+                    "self.query": {"__name__":"q"},
+                    "self.key": {"__name__":"k"},
+                    "self.value": {"__name__":"v"},
+                    "output.dense": {"__name__":"proj"},
+                    "output.LayerNorm": {"__name__":"layer_norm"},
+                },
+                "output": {"__name__":"ff",
+                            "dense": {"__name__":"w2"},
+                            "LayerNorm": {"__name__":"layer_norm"}
+                },
+                "intermediate": {"__name__":"ff",
+                                "dense": {"__name__":"w1"},
+                }
+            }
+        }
+    },
+}
+
 
 def transform(org_key, mapping, strict=True, warning=False, verbose=False):
 
@@ -249,7 +300,10 @@ def transform(org_key, mapping, strict=True, warning=False, verbose=False):
                 else:
                     new_chain.append(query)
             else:
-                new_chain.append(new_elem)
+                splited_new_elem = new_elem.split(".")
+                splited_new_elem = [e+"@" for e in splited_new_elem]
+                special_token = '.'.join(splited_new_elem)
+                new_chain.append(special_token) # special token for transformed key
             query = ""
         elif "$" in node:
             node = node["$"]
@@ -264,6 +318,7 @@ def transform(org_key, mapping, strict=True, warning=False, verbose=False):
             return
         else:
             new_chain.append(query.strip(".")) # tailing query
+
     new_key = ".".join(new_chain)
     if verbose:
         print(f"{org_key} => {new_key}")
@@ -329,55 +384,57 @@ class _LazyLoading(OrderedDict):
 
 
 class CommonStructureMap(object):
-    r""" A lazy loading structure map.
+    r""" A loading structure map.
     """
-    Mappings = _LazyLoading({
-        "RobertaForSequenceClassification": """mapping_for_SequenceClassification(roberta_mapping, "roberta")""",
-        "RobertaForMaskedLM": "roberta_mapping",
-        "BertForMaskedLM": "bert_mapping",
-        "T5ForConditionalGeneration": """mapping_for_ConditionalGeneration(t5_mapping, "t5")""",
-        "DebertaV2ForSequenceClassification": """mapping_for_SequenceClassification(debertav2_mapping, "deberta")""",
-        "CLIPModel":"""""",
-        "OPTForCausalLM":"""mapping_for_CausalLM(opt_mapping,"opt")"""
-    })
+    # Mappings = _LazyLoading({
+    #     "RobertaForSequenceClassification": """mapping_for_SequenceClassification(roberta_mapping, "roberta")""",
+    #     "RobertaForMaskedLM": "roberta_mapping",
+    #     "BertModel": "bert_model_mapping",
+    #     "T5ForConditionalGeneration": """mapping_for_ConditionalGeneration(t5_mapping, "t5")""",
+    #     "DebertaV2ForSequenceClassification": """mapping_for_SequenceClassification(debertav2_mapping, "deberta")""",
+    #     "CLIPModel":"""""",
+    #     "OPTForCausalLM":"""mapping_for_CausalLM(opt_mapping,"opt")"""
+    # })
+
+    New_Mappings = CoreMappings
 
     SpecialModelInverseMaps = {
     }
-    def __init__(self, mapping):
-        if not isinstance(mapping, dict):
-            raise TypeError(f"Initial a {CommonStructureMap.__name__} using a non-dict object. Consider using `load` instead.")
-        self.mapping = mapping
-
-
-    @classmethod
-    def load(cls, backbone_model, strict=True, warining=False, visualize=True):
-        r"""Doc
-        """
-        backbone_class = type(backbone_model).__name__
-        if backbone_class not in cls.Mappings:
+    def __init__(self, backbone_model, strict=True, warning=False, visualize=True):
+        self.matched_pairs = {}
+        self.find_sub_common_structure(backbone_model, matched_pairs=self.matched_pairs)
+        if len(self.matched_pairs) == 0:
             raise KeyError(MAPPINGERROR_MSG)
 
-        try:
-            mapping = cls.Mappings[backbone_class]
-        except KeyError:
-            logger.error(MAPPINGERROR_MSG)
-            exit(-1)
-
-
-
-
-        if visualize:
-            logger.info("Since you are using the common structure mapping, draw the transformed parameter structure for checking.")
-            vis = Visualization(backbone_model)
-            vis.structure_graph(common_structure=True, mapping=mapping)
-        return cls(mapping)
 
     def __repr__(self,):
         return self.mapping
 
-
     def transform(self, org_key, strict=True, warning=False):
-        return transform(org_key, self.mapping, strict, warning)
+        new_key = org_key
+        for key in self.matched_pairs:
+            left, right = org_key[:len(key)], org_key[len(key):].strip(".")
+            if left == key and len(right) > 0:
+                transformed_key = transform(right, self.matched_pairs[key], strict, warning)
+                print("11:", left, transformed_key)
+                if len(left) > 0:
+                    new_key = left + "." + transformed_key
+                break
+        return new_key
+
+    def find_sub_common_structure(self, module, prefix='',matched_pairs = []):
+        if module.__class__.__name__ in self.New_Mappings:
+            mapping = self.New_Mappings[module.__class__.__name__]
+            matched_pairs[prefix] =  mapping
+            return
+        for name, m in module.named_children():
+            new_prefix = '.'.join([prefix, name]) if prefix != '' else name
+            self.find_sub_common_structure(m, prefix=new_prefix, matched_pairs = matched_pairs)
+            
+
+
+
+
 
 
 

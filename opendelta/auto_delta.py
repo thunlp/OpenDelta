@@ -84,10 +84,9 @@ class AutoDeltaConfig:
     This class cannot be instantiated directly using ``__init__()`` (throws an error).
     """
 
-    def __init__(self):
-        raise EnvironmentError(
-            "AutoConfig is designed to be instantiated "
-            "using the ``AutoConfig.from_pretrained(pretrained_model_name_or_path)`` method."
+    def __init__(self, *args, **kwargs):
+        raise AttributeError(
+            f"{self.__class__.__name__} is designed to be instantiated using\n\t(1) `{self.__class__.__name__}.from_finetuned(finetuned_model_name_or_path)`\nor\t(2) `{self.__class__.__name__}.from_dict(config_dict, **kwargs)` "
         )
 
     @classmethod
@@ -315,10 +314,14 @@ class AutoDeltaModel:
     """
     _delta_model_mapping = LAZY_DELTA_MAPPING
     def __init__(self, *args, **kwargs):
-        raise EnvironmentError(
-            f"{self.__class__.__name__} is designed to be instantiated "
-            f"using the `{self.__class__.__name__}.from_pretrained(pretrained_model_name_or_path)` or "
-            f"`{self.__class__.__name__}.from_config(config)` methods."
+        # raise EnvironmentError(
+        #     f"{self.__class__.__name__} is designed to be instantiated "
+        #     f"using the `{self.__class__.__name__}.from_pretrained(pretrained_model_name_or_path)` or "
+        #     f"`{self.__class__.__name__}.from_config(config)` methods."
+        # )
+
+        raise AttributeError(
+            f"{self.__class__.__name__} is designed to be instantiated using\n\t(1) `{self.__class__.__name__}.from_finetuned(finetuned_delta_path, backbone_model, *model_args, **kwargs)`\nor\t(2) `{self.__class__.__name__}.from_config(delta_config, backbone_model, **kwargs)`"
         )
 
     @classmethod

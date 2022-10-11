@@ -210,7 +210,7 @@ class CompacterModel(DeltaBase):
     """
     config_class = CompacterConfig
     delta_type = "compacter"
-    default_modified_modules = ["attn", "ff"]
+    default_modified_modules = ["attn@", "ff@"]
     def __init__(self,
                  backbone_model,
                  modified_modules: Optional[List[str]] = None,
