@@ -90,9 +90,9 @@ class DeltaCenterArguments:
 class SaveLoadMixin:
     def add_configs_when_saving(self,):
         self.config.backbone_class = self.backbone_model.__class__.__name__
-        self.config.backbone_checkpoint_name = os.path.split(self.backbone_model.config._name_or_path.strip("/"))[-1]
+        if hasattr(self.backbone_model, "config"):
+            self.config.backbone_checkpoint_name = os.path.split(self.backbone_model.config._name_or_path.strip("/"))[-1]
         self.config.backbone_hash = gen_model_hash(self.backbone_model)
-
 
 
 
@@ -102,7 +102,7 @@ class SaveLoadMixin:
         save_config: bool = True,
         state_dict: Optional[dict] = None,
         save_function: Callable = torch.save,
-        push_to_dc: bool = True,
+        push_to_dc: bool = False,
         center_args: Optional[Union[DeltaCenterArguments, dict]] = dict(),
         center_args_pool: Optional[dict] = dict(),
         list_tags: Optional[List] = list(),
@@ -173,10 +173,15 @@ class SaveLoadMixin:
          # Save the config
         if save_config:
             self.config.save_finetuned(save_directory)
+        
 
 
-        logger.info("\n"+"*"*30+f"\nYou delta models has been saved locally to:\n\t{os.path.abspath(save_directory)}"
+        
+
+
+        logger.info("\n"+"*"*30+f"\nYou delta models has been saved locally to:\t{os.path.abspath(save_directory)}"
                  )
+        self.compute_saving(output_model_file)
 
         state_dict_total_params = sum(p.numel() for p in state_dict.values())
         other_tags={}
@@ -191,6 +196,19 @@ class SaveLoadMixin:
             else:
                 logger.info(f"Delay push: you can push it to the delta center later using \n\tpython -m DeltaCenter upload {os.path.abspath(save_directory)}\n"
                     +"*"*30)
+        else:
+            logger.info("We encourage users to push their final and public models to delta center to share them with the community!")
+
+    def compute_saving(self, output_model_file):
+        import os
+        stats = os.stat(output_model_file)
+        if stats.st_size > (1024**3):
+            unit = 'GB'
+            value = stats.st_size/(1024**3)
+        else:
+            unit = 'MB'
+            value = stats.st_size/(1024**2)
+        logger.info("The state dict size is {:.3f} {}".format(value, unit))
 
 
 

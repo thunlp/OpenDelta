@@ -1,4 +1,4 @@
-(unifyname)=
+(commonstructure)=
 
 # Common Structure Mapping
 
@@ -41,7 +41,7 @@ Visualize bert-base using a common structure name: The submodules that are not c
 
 ```{figure} ../imgs/commonstructure_vis.png
 :width: 600px
-:name: transformers_structure
+:name: commonstructure_vis
 ```
 
 (mappingexample)=

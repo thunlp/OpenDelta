@@ -1,7 +1,7 @@
 OpenDelta's documentation!
 =====================================
 
-OpenDelta is a **Plug-and-play** Library of the parameter-efficient fine-tuning ([delta-tuning](WhatisDelta)) technology for pre-trained models.
+[OpenDelta](https://github.com/thunlp/OpenDelta/) is a **Plug-and-play** Library of the parameter-efficient fine-tuning ([delta-tuning](WhatisDelta)) technology for pre-trained models.
 
 
 ## Essential Advantages:
@@ -35,11 +35,18 @@ OpenDelta is a **Plug-and-play** Library of the parameter-efficient fine-tuning 
    notes/pluginunplug.md
    notes/acceleration.md
    notes/explored_config.md
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Information
+
    notes/citation.md
+   notes/update.md
+   notes/faq.md
 
 .. toctree::
    :maxdepth: 2
-   :caption: Package Reference
+   :caption: Documentation
 
    modules/base
    modules/deltas

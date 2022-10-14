@@ -1,4 +1,3 @@
-(visualization)=
 # Visualize the Parameters
 
 When OpenDelta makes modifications to a pretrained model (PTM), it is beneficial to know what your PTM looks like, especially the location of the parameters.

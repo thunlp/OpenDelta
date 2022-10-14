@@ -19,7 +19,9 @@ import datetime
 import sphinx_rtd_theme
 import doctest
 import opendelta
-import opendelta.delta_models
+
+
+
 
 # -- Project information -----------------------------------------------------
 
@@ -29,8 +31,8 @@ copyright = '{}, {}, Licenced under the Apache License, Version 2.0'.format(date
 
 
 # The full version, including alpha/beta/rc tags
-release = '0.1.1'
-version = "0.1.1"
+release = '0.3.0'
+version = "0.3.0"
 
 html_theme = 'sphinx_rtd_theme'
 html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]

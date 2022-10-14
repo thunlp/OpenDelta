@@ -3,6 +3,7 @@
 from collections import OrderedDict
 from multiprocessing.sharedctypes import Value
 import os
+from turtle import back
 from opendelta.delta_configs import BaseDeltaConfig
 from opendelta.utils.model_md5 import gen_model_hash
 from opendelta.utils.signature import get_arg_names, signature
@@ -23,17 +24,16 @@ from opendelta.utils.structure_mapping import CommonStructureMap
 from opendelta.utils.interactive.web import interactive
 from opendelta.utils.data_parallel import new_replicate_for_data_parallel
 from opendelta.utils.cuda import move_dict_to_cuda
+import sys
 
 logger = logging.get_logger(__name__)
 
 def is_leaf_module(module):
     r"""Whether the module is a leaf module
     """
-    try:
-        return len([n for n,_ in module.named_children()]) == 0
-    except:
-        from IPython import embed
-        embed()
+    return len([n for n,_ in module.named_children()]) == 0
+
+        
 
 def non_module_param(module: nn.Module):
     module_names = [n for n, _ in module.named_modules()]
@@ -92,7 +92,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
     default_exclude_modules = ["lm_head"]
     config_class = BaseDeltaConfig
     default_unfrozen_modules = ["deltas"]
-    pass_pseudo_data = True
+    _need_pseudo_data = True
     def __init__(self,
                  backbone_model: nn.Module,
                  modified_modules: Optional[List[str]] = None,
@@ -130,7 +130,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
                 self.exclude_modules = self.default_exclude_modules
             self.common_structure = common_structure
         if self.common_structure:
-            self.structure_mapping = CommonStructureMap.load(self.backbone_model)
+            self.structure_mapping = CommonStructureMap(self.backbone_model)
         else:
             self.structure_mapping = None
         if unfrozen_modules is None:
@@ -138,7 +138,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         if self.common_structure and self.structure_mapping is None:
             raise RuntimeError("Using common structure but the structure mapping is None")
 
-    def forward(self, *args, **kwargs) -> "RuntimeError":
+    def forward(self, *args, **kwargs) -> RuntimeError:
         r"""
             .. warning::
 
@@ -198,16 +198,27 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         # create a new key list to avoid recursion.
         backbone_key_list = [key for key, _ in backbone.named_modules()]
         for key in backbone_key_list:
-            if self.find_key(key, modified_modules): #TODO may have bugs when commonstructure has a virtual node and it's refered
-                logger.debug("find key: {}".format(key))
+            print(key)
+            if self.find_key(key, modified_modules):
+                print("found!")
                 self.update_module(backbone, key)
-        if self.pass_pseudo_data:
+        if self._need_pseudo_data:
             self._pseudo_data_to_instantiate(backbone)
+                    
         # mark the paratmers that are the delta parameters for easily displaying the delta_paramters.
         self.mark_as_delta()
         return backbone
 
-
+    def _pseudo_data_to_instantiate(self, backbone: Optional[nn.Module]=None):
+        if self.structure_mapping is None:
+            self._pseudo_data_to_instantiate_module(backbone)
+        else:
+            for key in self.structure_mapping.matched_pairs:
+                if key == "":
+                    submodule = backbone
+                else:
+                    _, _, submodule = self.find_module(backbone, key)
+                self._pseudo_data_to_instantiate_module(submodule)
 
     def mark_as_delta(self, module: nn.Module=None,):
         r"""[NODOC] Mark :obj:`module`'s all parameters as delta parameters by setting a ``_is_delta`` attribute to each of them.
@@ -313,19 +324,23 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         for x in self.exclude_modules:
             if key.startswith(x): # start with the excluded key
                 return False
-        if self.common_structure:
-            key = self.structure_mapping.transform(key, strict=False)
+        if self.structure_mapping is not None:
+            key, virtual_key, in_virtual_order = self.structure_mapping.transform(key, strict=False)
+            # currently in_virtual_order not in use, it means that if the common structure designate adding adapter to FFN, it will be add to all submodule of FFN. 
         if not key:
             return False
-        try:
+        if virtual_key is None:
             return endswith_in(key, target_list)
-        except:
-            raise RuntimeError("find_key exception")
+        else:
+            return endswith_in(key, target_list) or endswith_in(virtual_key, target_list)
 
-    def _pseudo_data_to_instantiate(self, module: Optional[nn.Module]=None):
-        r"""Create a pseudo_data into the module to know the dimemsion of each tensor in the computation graph.
-        First try to use the dummy_inputs of the pretrained model. If the model has no dummy_inputs, will try to create
-        integer tensor as the pseudo_input,  if ``decoder_input_ids`` is in the model's forward function, additional create it.
+
+    def _pseudo_data_to_instantiate_module(self, module: Optional[nn.Module]=None):
+        r"""Some delta model requires a pseudo-data be passed through the model to understand the dimensionality of each tensor in the computation graph.
+
+        (1) The model in the Huggingface Transformers library usually has the so-called `dummy_inputs`. We will make use of it.
+        (2) If the model does not have `dummy_inputs`, we will try to create it and throw a warning.
+        (3) If we encounter an error in (2), we will suggest you to create it by passing the dummy_inputs variable.
 
         Args:
             module (:obj:`nn.Module`, *optional*, default to :obj:`None`): The backbone model.
@@ -334,17 +349,32 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         if module is None:
             module = self.backbone_model
         device = get_device(module)
+        _auto_dummy = False
         try:
             dummy_inputs = module.dummy_inputs
             dummy_inputs = move_dict_to_cuda(dummy_inputs, device)
-            module(**dummy_inputs)
         except AttributeError:
-            logger.warning("No dummy_inputs attributes, create a common input_ids for input.")
-            pseudo_input = torch.tensor([[0,0]]).to(device)
+            logger.warning(f"No `dummy_inputs` attribute in {module.__class__.__name__} , automatically create `dummy_inputs`. Very likely to encounter error. To set dummy_inputs for your model, please use: `setattr(backbone_model, 'dummy_inputs', some_dummy_inputs)` before initializing `{self.__class__.__name__}`")
+            _auto_dummy = True
+            pass
+        if _auto_dummy:
+            _most_simple_input = torch.tensor([[0,0]]).to(device)
             if "decoder_input_ids" in  signature(module.forward).args:
-                module(pseudo_input, decoder_input_ids = pseudo_input)
+                dummy_inputs = {"input_ids": _most_simple_input, "decoder_input_ids": _most_simple_input}
             else:
-                module(pseudo_input)
+                dummy_inputs = {"input_ids": _most_simple_input}
+
+        _auto_dummy_fail = False
+        try:
+            module(**dummy_inputs)
+        except:
+            _auto_dummy_fail = True
+        if _auto_dummy_fail:  
+            raise AttributeError(f"\nThe {self.__class__.__name__} requires a pseudo-data to be passed through the model to understand the dimensionality of each tensor in the computation graph. \nThe automatically created dummy inputs failed.\nThe `dummy_inputs` can be any data that make `backbone_model.forward(**dummy_inputs)` succeed. Only the form and shape of the `dummy_inputs` matter.\n\tTo set dummy_inputs for your model, please use: `setattr(backbone_model, 'dummy_inputs', some_dummy_inputs)` before initializing `{self.__class__.__name__}` ")
+           
+
+
+
 
     def trainable_parameters_names(self, module: Optional[nn.Module]=None):
         r"""[NODOC] A small sugar function to return all the trainable parameter's name in the (by default, backbone) model.
@@ -521,8 +551,6 @@ class DeltaBase(nn.Module, SaveLoadMixin):
             delta_module = getattr(org_module, delta_name)
             if hasattr(delta_module, "pre_forward"):# is not None:
                 args, kwargs = delta_module.pre_forward(*args, **kwargs)
-            # from IPython import embed
-            # embed(header = "true")
             ret = _org_func(*args, **kwargs)
             if hasattr(delta_module, "post_forward"):# is not None:
                 ret = delta_module.post_forward(ret)
@@ -625,8 +653,6 @@ class DeltaBase(nn.Module, SaveLoadMixin):
                     state_dict.pop(n)
             return state_dict
         includes = self.trainable_parameters_names(module) # use excludes will have trouble when the model have shared weights
-        # print(includes, "grad:",self.backbone_model.plm.lm_head.weight.requires_grad)
-        # exit()
         if hasattr(module.state_dict, "__wrapped__"):
             raise RuntimeWarning("The forward function might have been wrapped by a decorator, is it intended? Do you freeze the parameters twice?")
         module.state_dict = decorate(module.state_dict, _caller, extras=(includes,), kwsyntax=True) # decorator.decorate helps preserving the functions metadata (signature, etc.).

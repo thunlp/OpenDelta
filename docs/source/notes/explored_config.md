@@ -1,11 +1,7 @@
 (favoredconfiguration)=
 # Favored Configuration
 
-<img src="../imgs/todo-icon.jpeg" height="30px"> We will add the commonly used configuration of delta models HERE in future.
+Generally, the default configurations are already good enough. If you want squeeze the size of delta models further, you can refer to the following papers.
 
-E.g.
-- the modified_modules (position of delta), 
-- hyperparameter that are the most efficient
-- the favored composition between delta models
-
-Currenlty, use the default setting, explore it by yourself, or refer to existing papers' configuration!
+ - [AdapterDrop: On the Efficiency of Adapters in Transformers](https://arxiv.org/abs/2010.11918)
+ - [Sparse Structure Search for Parameter-Efficient Tuning(Delta Tuning)](https://arxiv.org/abs/2206.07382)

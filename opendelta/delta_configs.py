@@ -23,51 +23,38 @@ class BaseDeltaConfig:
 
     Class attributes (overridden by derived classes):
 
-    - **delta_type** （:obj:`str`) -- the name of the delta modules, used to create the correct :py:class:`~opendelta.AutoConfig`.
+    - **delta_type** (:obj:`str`) -- the name of the delta modules, used to create the correct :py:class:`~opendelta.AutoConfig`.
 
     Args:
-        modified_modules (:obj:`List[str]`, *optional*, defaults to :obj:``None``)
+        modified_modules (:obj:`List[str]`, *optional*, defaults to :obj:`None`)
             The list of keys to determine which modules you want to modify. OpenDelta will take every modulees that
             **ends with** the one of the provided keys as the modification target. When not given any value, i.e.
             ``modified_modules=None``, the delta module will use the it corresponding default modification modules.
             Taking DistilBertModel with an classifier on top as an example:
 
             .. note::
-                **Examples**: When adding delta to DistilBertModel,
 
-                1. set to ``["0.attention.out_lin"]`` will add delta modules to the attention output of distilbert's
-                ayer 0, i.e., ``distilbert.transformer.layer.0.attention.out_lin``.
-
+                **Examples**: When adding delta to `DistilBertModel <https://huggingface.co/docs/transformers/model_doc/distilbert>`_,
+                
+                1. set to ``["0.attention.out_lin"]`` will add delta modules to the attention output of distilbert's layer 0, i.e., ``distilbert.transformer.layer.0.attention.out_lin``.
                 2. set to ``["attention.out_lin"]`` will add the delta modules in every layer's ``attention.out_lin``.
 
-        unfrozen_modules (:obj:`List[str]`, *optional*, defaults to :obj:`["deltas"]` )
-        exclude_modules (:obj:`str`, *optional*, default to :obj:`None`): The modules starts with these strings will
-                be excluded in modification. Note that currently only plain text (no regular expression) is supported.
+        unfrozen_modules (:obj:`List[str]`, *optional*, defaults to :obj:`["deltas"]` ): The modules that are unfrozen
+            during training in :meth:`~opendelta.basemodel.DeltaBase.freeze_module`, which includes the ones that are newly introduced as delta modules, and the ones that are originally a part of the model but set to trainable (:obj:`requires_grad=True`) to train together with the delta modules. Opendelta will take every modules that **ends with** the one of the provided keys and all its sub-modules and paramters as trainable.
 
-        The modules that are unfrozen
-            during training. Including the ones that are newly introduced as delta modules, and the ones that are
-            originally a part of the model but set to trainable (:obj:`requires_grad=True`) to train together with the
-            delta modules. OpenDelta will take every modules that **ends with** the one of the provided keys and all
-            its sub-modules and paramters as trainable.
+        exclude_modules (:obj:`str`, *optional*, default to :obj:`None`): The modules starts with these strings will be excluded in modification. Note that currently only plain text (no regular expression) is supported.
 
             .. note::
+
                 **Examples**: When adding delta to DistilBertModel,
-
+        
                 1. set this argument to ``["bias"]`` will make all bias terms tunable.
-
                 2. set this argument to ``["attention"]`` will make all parameters in all attention modules tunable.
-
-                3. set this argument to ``["deltas"]`` will make all the parameters in the newly introduced delta
-                modules tunable.
-
+                3. set this argument to ``["deltas"]`` will make all the parameters in the newly introduced delta modules tunable.
                 4. set this argument to ``["classifier"]`` will make all parameters in the classifier tunable.
+                5. set this argument to ``["3.ffn.lin2", "deltas", "classifier"]``, will make all parameters in the third layer's feed forward layer's send linear layer, the detla modules, and the classifiers modules tunable.
 
-                5. set this argument to ``["3.ffn.lin2", "deltas", "classifier"]``, will make all parameters in
-                the third layer's feed forward layer's send linear layer, the detla modules, and the classifiers modules
-                tunable.
-
-        common_structure (:obj:`bool`, *optional*, default to :obj:`None`): Whether using the common structure mapping of
-                the transformer model when designating :obj:`modified_modules` and :obj:`unfrozen_modules`.
+        common_structure (:obj:`bool`, *optional*, default to :obj:`None`): Whether using the common structure mapping of the transformer model when designating ``modified_modules` and ``unfrozen_modules``.
         backbone_class (:obj:`str`, *optional*, default to :obj:`None`): The name of backbone model's class, e.g.
                 ``RobertaForMaskedLM``. Saving this infomation let the users explicitly know on which backbone the
                 delta model is trained.
@@ -106,13 +93,13 @@ class BaseDeltaConfig:
         Args:
             finetuned_model_name_or_path (:obj:`str` or :obj:`os.PathLike`): This can be either:
 
-                * a string, the *model id* of a finetuned delta model configuration hosted inside a model repo on
+                - a string, the *model id* of a finetuned delta model configuration hosted inside a model repo on
                   deltahub.co. Valid model ids can be located at the root-level, like ``bert-base-uncased``, or
                   namespaced under a user or organization name, like ``dbmdz/bert-base-german-cased``.
-
-                * a path to a *directory* containing a configuration file saved using the :meth:`BaseDeltaConfig.save_finetuned` method, e.g., ``./my_model_directory/``.
-
-                * a path or url to a saved configuration JSON *file*, e.g., ``./my_model_directory/configuration.json``.
+                  
+                - a path to a *directory* containing a configuration file saved using the :meth:`BaseDeltaConfig.save_finetuned` method, e.g., ``./my_model_directory/``.
+                
+                - a path or url to a saved configuration JSON *file*, e.g., ``./my_model_directory/configuration.json``.
 
             cache_dir (:obj:`str` or :obj:`os.PathLike`, *optional*):
                 Path to a directory in which a downloaded pretrained delta model configuration should be cached if the
@@ -120,7 +107,7 @@ class BaseDeltaConfig:
 
         .. code-block:: python
 
-            delta_config = LoraConfig.from_finetuned("DeltaHub/lora_t5-base_mrpc")
+            delta_config = AdapterConfig.from_finetuned("thunlp/FactQA_T5-large_Adapter", backbone_model=t5)
 
         """
         config_dict, kwargs = cls.get_config_dict(finetuned_delta_path, **kwargs)
@@ -132,7 +119,7 @@ class BaseDeltaConfig:
 
         return cls.from_dict(config_dict, **kwargs)
 
-    def save_finetuned(self, save_directory: Union[str, os.PathLike], push_to_hub: bool = False, **kwargs):
+    def save_finetuned(self, save_directory: Union[str, os.PathLike], **kwargs):
         """
         Save a configuration object to the directory :obj:`save_directory`, so that it can be re-loaded using the
         :meth:`BaseDeltaConfig.from_finetuned` class method.
@@ -144,21 +131,14 @@ class BaseDeltaConfig:
                 the Hugging Face model hub after saving it.
 
                 .. warning::
-                    1. Will raise error if you haven't config a Huggingface Model Hub.
-                    2. Using ``push_to_hub=True`` will synchronize the repository you are pushing to with ``save_directory``,
-                    which requires ``save_directory`` to be a local clone of the repo you are pushing to if it's an existing
-                    folder. Pass along ``temp_dir=True`` to use a temporary directory instead.
 
-            kwargs:
-                Additional key word arguments passed along to the
-                `PushToHubMixin.push_to_hub <https://huggingface.co/docs/transformers/master/main_classes/model#transformers.file_utils.PushToHubMixin.push_to_hub>`_ method.
+                    1. Will raise error if you haven't config a Huggingface Model Hub.
+                    2. Using ``push_to_hub=True`` will synchronize the repository you are pushing to with ``save_directory``, which requires ``save_directory`` to be a local clone of the repo you are pushing to if it's an existing folder. Pass along ``temp_dir=True`` to use a temporary directory instead.
+
+            kwargs: Additional key word arguments.
         """
         if os.path.isfile(save_directory):
             raise AssertionError(f"Provided path ({save_directory}) should be a directory, not a file")
-
-        if push_to_hub:
-            commit_message = kwargs.pop("commit_message", None)
-            repo = self._create_or_get_repo(save_directory, **kwargs)
 
         os.makedirs(save_directory, exist_ok=True)
         # If we save using the predefined names, we can load using `from_pretrained`
@@ -167,9 +147,6 @@ class BaseDeltaConfig:
         self.to_json_file(output_config_file, use_diff=True)
         logger.info(f"Configuration saved in {output_config_file}")
 
-        if push_to_hub:
-            url = self._push_to_hub(repo, commit_message=commit_message)
-            logger.info(f"Configuration pushed to the hub in this commit: {url}")
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any], **kwargs) -> "BaseDeltaConfig":
@@ -354,8 +331,6 @@ class BaseDeltaConfig:
     def to_dict(self) -> Dict[str, Any]:
         """
         Serializes this instance to a Python dictionary.
-        Returns:
-            :obj:`dict`: Dictionary of all the attributes that make up this configuration instance.
         """
         output = copy.deepcopy(self.__dict__)
         if hasattr(self.__class__, "model_type"):

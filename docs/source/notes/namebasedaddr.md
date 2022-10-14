@@ -1,4 +1,4 @@
-(namebasedaddr)=
+
 # Name-based Addressing
 
 Named based addressing is what set OpenDelta apart from other packages and provide the possibility to be used to a broader range of models (even emerging ones).
@@ -52,7 +52,7 @@ In this case, string `"name_b.0.name_a"` will be the name to address the submodu
 
 Thus when applying a delta model to this toy net.
 
-```
+```python
 from opendelta import AdapterModel
 AdapterModel(backbone_model=root, modified_modules=['name_b.0.name_a'])
 Visualization(root).structure_graph()
@@ -67,7 +67,7 @@ name: toy-delta
 ```
 ````
 
-
+(targetmodules)=
 ## Target modules.
 
 For different delta methods, the operation for the modification target is different.
@@ -88,7 +88,7 @@ Handcrafting the full names of submodules can be frustrating. We made some simpl
 1. **End-matching** Rules.
 
     OpenDelta will take every modules that 
-    **ends with** the provided name suffix as the modification [target module](target_module). 
+    **ends with** the provided name suffix as the modification [target module](targetmodules). 
     :::{admonition} Example
     :class: tip
     Taking DistilBert with an classifier on top as an example:
@@ -115,7 +115,7 @@ Handcrafting the full names of submodules can be frustrating. We made some simpl
     :::{admonition} Regex in Json Configs 
     :class: warning
     In json, you should write `"\\."` instead of `"\."` for a real dot due to json parsing rules. That is 
-    ```json
+    ```
     {   
         ...
         "modified_moduls": ['[r][0-5]\\.attention'],
@@ -138,7 +138,7 @@ Handcrafting the full names of submodules can be frustrating. We made some simpl
     delta_model = LoraModel(backbone_model=model, interactive_modify=True)
     ```
 
-    by setting `interactive_modify`, a web server will be opened on local host, and the link will be print in the terminal.
+    by setting `interactive_modify`, a web server will be opened on local host, and the link will be print in the terminal, e.g.,
 
     ```
     http://0.0.0.0:8888/
