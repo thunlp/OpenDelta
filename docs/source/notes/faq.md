@@ -1,3 +1,3 @@
 # FAQ
 
-1. We haven't provide common structure mapping for this backbone model...
+1. 

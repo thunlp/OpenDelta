@@ -210,7 +210,8 @@ class CompacterModel(DeltaBase):
     """
     config_class = CompacterConfig
     delta_type = "compacter"
-    default_modified_modules = ["attn@", "ff@"]
+    default_modified_modules = ["attn@.proj@", "ff@.w2@"]
+    _need_pseudo_data = True
     def __init__(self,
                  backbone_model,
                  modified_modules: Optional[List[str]] = None,
@@ -260,16 +261,16 @@ class CompacterModel(DeltaBase):
                                    )
 
 
-    def add_all_delta_to_backbone(self,
-                 module: nn.Module,
-                 modified_modules: List[str],
-                ) -> nn.Module:
-        for key, _ in module.named_modules():
-            if self.find_key(key, modified_modules):
-                self.update_module(module, key)
-        self._pseudo_data_to_instantiate(module)
-        self.mark_as_delta()
-        return module
+    # def add_all_delta_to_backbone(self,
+    #              module: nn.Module,
+    #              modified_modules: List[str],
+    #             ) -> nn.Module:
+    #     for key, _ in module.named_modules():
+    #         if self.find_key(key, modified_modules):
+    #             self.update_module(module, key)
+    #     self._pseudo_data_to_instantiate(module)
+    #     self.mark_as_delta()
+    #     return module
 
     def update_module(self, module: nn.Module, key: str):
         _, _, ref = self.find_module(module, key)

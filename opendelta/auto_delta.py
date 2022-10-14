@@ -5,6 +5,7 @@ import torch.nn as nn
 from opendelta.utils.logging import get_logger
 import importlib
 from opendelta.delta_configs import BaseDeltaConfig
+from opendelta.basemodel import DeltaBase
 logger = get_logger(__name__)
 
 
@@ -80,7 +81,7 @@ LAZY_CONFIG_MAPPING = _LazyConfigMapping(DELTA_CONFIG_MAPPING)
 class AutoDeltaConfig:
     r"""
     This is a generic configuration class that will be instantiated as one of the configuration classes of the library
-    when created with the :py:meth:`~AutoConfig.from_pretrained` class method.
+    when created with the :meth:`~AutoDeltaConfig.from_finetuned` or :meth:`~AutoDeltaConfig.from_dict` class method. 
     This class cannot be instantiated directly using ``__init__()`` (throws an error).
     """
 
@@ -98,8 +99,12 @@ class AutoDeltaConfig:
             config_dict (:obj:`dict`): The dict of configs of delta model.
             kwargs: Other keyword argument pass to initialize the config.
 
-        >>> config = AutoDeltaConfig.from_dict({"delta_type":"lora"}) # This will load the dault lora config.
-        >>> config = AutoDeltaConfig.from_dict({"delta_type":"lora", "lora_r":5}) # Will load the default lora config, with lora_r = 5
+        Examples:
+        
+        .. code-block:: python
+
+            config = AutoDeltaConfig.from_dict({"delta_type":"lora"}) # This will load the dault lora config.
+            config = AutoDeltaConfig.from_dict({"delta_type":"lora", "lora_r":5}) # Will load the default lora config, with lora_r = 5
 
         """
         config_dict = deepcopy(config_dict)
@@ -119,54 +124,22 @@ class AutoDeltaConfig:
 
         Parameters:
 
-            finetuned_delta_path (:obj:`str` or :obj:`os.PathLike`, *optional*):
-                Can be either:
+            finetuned_delta_path (:obj:`str` or :obj:`os.PathLike`, *optional*): Can be either:
 
-                - A string, the *model id* of a finetuned delta model configuration hosted inside a model repo on
-                  huggingface.co. Valid model ids can be located at the root-level, like ``Davin/lora``, or
-                  namespaced under a user or organization name, like ``DeltaHub/lora_t5-base_mrpc``.
-                - A path to a *directory* containing a configuration file saved using the
-                  :py:meth:`DeltaBase.save_finetuned` method,
-                  e.g., ``./my_model_directory/``.
-                - A path or url to a saved configuration JSON *file*, e.g.,
-                  ``./my_model_directory/configuration.json``.
-                The last two option are not tested but inherited from huggingface.
+                - A string, the model id of a finetuned delta model configuration hosted inside a model repo on huggingface.co. Valid model ids can be located at the root-level, like ``Davin/lora``, or namespaced under a user or organization name, like ``DeltaHub/lora_t5-base_mrpc``.
+                - A path to a *directory* containing a configuration file saved using the :py:meth:`~opendelta.basemodel.DeltaBase.save_finetuned` method, e.g., ``./my_model_directory/``.
+                - A path or url to a saved configuration JSON *file*, e.g.,``./my_model_directory/configuration.json``.
+
             cache_dir (:obj:`str` or :obj:`os.PathLike`, *optional*):
                 Path to a directory in which a downloaded pretrained model configuration should be cached if the
                 standard cache should not be used.
-            force_download (:obj:`bool`, *optional*, defaults to :obj:`False`):
-                Whether or not to force the (re-)download the model weights and configuration files and override the
-                cached versions if they exist.
-            resume_download (:obj:`bool`, *optional*, defaults to :obj:`False`):
-                Whether or not to delete incompletely received files. Will attempt to resume the download if such a
-                file exists.
-            proxies (:obj:`Dict[str, str]`, *optional*):
-                A dictionary of proxy servers to use by protocol or endpoint, e.g., `{'http': 'foo.bar:3128',
-                'http://hostname': 'foo.bar:4012'}`. The proxies are used on each request.
-            revision(:obj:`str`, *optional*, defaults to ``"main"``):
-                The specific model version to use. It can be a branch name, a tag name, or a commit id, since we use a
-                git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any
-                identifier allowed by git.
-            return_unused_kwargs (:obj:`bool`, *optional*, defaults to ``False``):
-                If ``False``, then this function returns just the final configuration object.
-                If ``True``, then this functions returns a ``Tuple(config, unused_kwargs)`` where *unused_kwargs* is a
-                dictionary consisting of the key/value pairs whose keys are not configuration attributes: i.e., the
-                part of ``kwargs`` which has not been used to update ``config`` and is otherwise ignored.
-            trust_remote_code (:obj:`bool`, *optional*, defaults to ``False``):
-                Whether or not to allow for custom models defined on the Hub in their own modeling files. This option
-                should only be set to ``True`` for repositories you trust and in which you have read the code, as it will
-                execute code present on the Hub on your local machine.
-            kwargs(additional keyword arguments, *optional*):
-                The values in kwargs of any keys which are configuration attributes will be used to override the loaded
-                values. Behavior concerning key/value pairs whose keys are *not* configuration attributes is controlled
-                by the ``return_unused_kwargs`` keyword parameter.
-
+            
         Examples:
 
         .. code-block:: python
 
             from transformers import AutoConfig
-            delta_config = AutoDeltaConfig.from_finetuned("DeltaHub/lora_t5-base-mrpc")
+            delta_config = AutoDeltaConfig.from_finetuned("thunlp/FactQA_T5-large_Adapter")
 
         """
 
@@ -325,7 +298,7 @@ class AutoDeltaModel:
         )
 
     @classmethod
-    def from_config(cls, config, backbone_model, **kwargs): #-> "DeltaBase":
+    def from_config(cls, config, backbone_model, **kwargs) -> DeltaBase:
         r"""Automatically instantiates a delta model based on the :obj:`config`. The delta model correspond to the delta
         :obj:`config` will be loaded and initialized using the arguments in :obj:`config`.
 
@@ -355,35 +328,28 @@ class AutoDeltaModel:
         )
 
     @classmethod
-    def from_finetuned(cls, finetuned_delta_path, backbone_model, *model_args, **kwargs):
+    def from_finetuned(cls, finetuned_delta_path, backbone_model, *model_args, **kwargs) -> DeltaBase:
         r""" Automatically instantiated a delta model and load the finetuned checkpoints based on the
         :obj:`finetuned_delta_path`, which can either be a string pointing to a local path or a url pointint to
         the delta hub. It will check the hash after loading the delta model to see whether the correct backbone and
         delta checkpoint are used.
 
         Args:
-            finetuned_delta_path (:obj:`str` or :obj:`os.PathLike`, *optional*):
-                Can be either:
+            finetuned_delta_path (:obj:`str` or :obj:`os.PathLike`, *optional*): Can be either: 
 
-                - A string, the *model id* of a finetuned delta model configuration hosted inside a model repo on
-                  huggingface.co. Valid model ids can be located at the root-level, like ``Davin/lora``, or
-                  namespaced under a user or organization name, like ``DeltaHub/lora_t5-base_mrpc``.
-                - A path to a *directory* containing a configuration file saved using the
-                  :py:meth:`DeltaBase.save_finetuned` method,
-                  e.g., ``./my_model_directory/``.
-                - A path or url to a saved configuration JSON *file*, e.g.,
-                  ``./my_model_directory/configuration.json``.
-                The last two option are not tested but inherited from huggingface.
+                - A string, the model name of a finetuned delta model configuration hosted inside a model repo on `Delta Center <https://www.openbmb.org/toolKits/deltacenter>`_, like ``thunlp/FactQA_T5-large_Adapter``.
+                - A path to a directory containing a configuration file saved using the :meth:`~opendelta.utils.saving_loading_utils.SaveLoadMixin.save_finetuned` method, e.g., ``./my_model_directory/``.
+                - A path or url to a saved configuration JSON *file*, e.g., ``./my_model_directory/configuration.json``.The last two option are not tested but inherited from huggingface.
 
             backbone_model (:obj:`nn.Module`): The backbone model to be modified.
-            model_args: Other argument for initialize the model.
-            kwargs: Other kwargs that will be passed into DeltaBase.from_finetuned.
+            model_args: Other argument for initialize the model. See :`DeltaBase.from_finetuned` for details.
+            kwargs: Other kwargs that will be passed into DeltaBase.from_finetuned. See `DeltaBase.from_finetuned` for details.
 
         Example:
 
         .. code-block:: python
 
-            delta_model = AutoDeltaModel.from_finetuned("DeltaHub/lora_t5-base-mrpc", backbone_model)
+            delta_model = AutoDeltaModel.from_finetuned("thunlp/FactQA_T5-large_Adapter", backbone_model=5)
 
         """
         delta_config = kwargs.pop("delta_config", None)

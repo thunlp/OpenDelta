@@ -1,29 +1,53 @@
 # Adapted from Tevatron (https://github.com/texttron/tevatron)
 
+from argparse import ArgumentParser
 import logging
 import os
 import sys
-
-from openmatch.arguments import DataArguments
-from openmatch.arguments import DRTrainingArguments as TrainingArguments
-from openmatch.arguments import ModelArguments
-from openmatch.dataset import QPCollator, DRTrainDataset, DREvalDataset
-from openmatch.modeling import DRModel
-from openmatch.trainer import DRTrainer as Trainer
-from openmatch.trainer import GCDenseTrainer
-from transformers import AutoConfig, AutoTokenizer, HfArgumentParser, set_seed
-from transformers.integrations import TensorBoardCallback
+import torch.nn as nn
 
 logger = logging.getLogger(__name__)
 
 
 class UnitTest:
-    def __init__(self, model):
-        self.model = model
+    def __init__(self, models):
+        self.models = models
     
+        self.Configs = {}
+        self.Configs[0] =  {
+            "delta_type": "lora",
+        }
     
-    def unitTest1(self, delta_config_dict):
-        model = self.model
+        self.Configs[1] =  {
+            "delta_type": "bitfit",
+        }
+    
+        self.Configs[2] =  {
+            "delta_type": "adapter",
+        }
+    
+        self.Configs[3] =  {
+            "delta_type": "compacter",
+        }
+    
+        self.Configs[4] =  {
+            "delta_type": "prefix",
+        }
+
+        self.Configs[5] =  {
+            "delta_type": "soft_prompt",
+        }
+    
+        self.Configs[6] =  {
+            "delta_type": "low_rank_adapter",
+        }
+
+    def get_delta_config(self, config_id):
+        return self.Configs[config_id]
+
+
+    def unitTest0(self, delta_config_dict):
+        model = self.models[0]
         from opendelta import Visualization
         Visualization(model).structure_graph()
 
@@ -34,17 +58,78 @@ class UnitTest:
 
         from opendelta import Visualization
         Visualization(model).structure_graph()
+    
+    def unitTest1(self, delta_config_dict):
+        class Mymodel(nn.Module):
+            def __init__(self, a,b):
+                super().__init__()
+                self.a = a
+                self.b = b
+        
+        model  = Mymodel(self.models[0], self.models[1])
+        from opendelta import Visualization
+        Visualization(model).structure_graph()
 
+        from opendelta import AutoDeltaConfig, AutoDeltaModel
+
+        delta_config = AutoDeltaConfig.from_dict(delta_config_dict)
+        delta_model = AutoDeltaModel.from_config(delta_config, backbone_model = model)
+
+        from opendelta import Visualization
+        Visualization(model).structure_graph()
+        delta_model.save_finetuned("./tmp")
+
+        delta_model.freeze_module(exclude=['deltas'])
+        delta_model.save_finetuned("./tmp")
+
+        model = Mymodel(self.models[0], self.models[1])
+        Visualization(model).structure_graph()
+        delta_model = AutoDeltaModel.from_finetuned("./tmp", backbone_model=model)
+        Visualization(model).structure_graph()
+
+
+        
+
+
+
+    
+    def unit_test(self, test_id, config_id):
+        delta_config_dict = self.Configs[config_id]
+        if test_id == 0:
+            self.unitTest0(delta_config_dict)
+        elif test_id == 1:
+            self.unitTest1(delta_config_dict)
+
+
+from dataclasses import dataclass, field
+
+@dataclass
+class UnitTestArguments:
+    """
+    Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
+    """
+    config_id: int = field(
+        default=0,
+    )
+    test_id: int = field(
+        default=0,
+    )
+    model_name_or_path: str =field(
+        default='bert-base-cased', 
+        metadata={"help": "tested: bert-base-cased, roberta-base, rinna/japanese-gpt2-small, t5-small, facebook/opt-125m"}
+    )
+
+
+from transformers import HfArgumentParser,TrainingArguments, AutoModel, GPT2Model
 
 def main():
-    parser = HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
+    parser = HfArgumentParser((TrainingArguments, UnitTestArguments))
+
 
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+        training_args, unit_test_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
-        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-        model_args: ModelArguments
-        data_args: DataArguments
+        training_args, unit_test_args = parser.parse_args_into_dataclasses()
         training_args: TrainingArguments
 
     if (
@@ -72,70 +157,25 @@ def main():
         training_args.fp16,
     )
     logger.info("Training/evaluation parameters %s", training_args)
-    logger.info("MODEL parameters %s", model_args)
-
-    set_seed(training_args.seed)
-
-    num_labels = 1
-    config = AutoConfig.from_pretrained(
-        model_args.config_name if model_args.config_name else model_args.model_name_or_path,
-        num_labels=num_labels,
-        cache_dir=model_args.cache_dir,
-    )
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
-        cache_dir=model_args.cache_dir,
-        use_fast=False,
-    )
-    model = DRModel.build(
-        model_args,
-        data_args,
-        training_args,
-        config=config,
-        cache_dir=model_args.cache_dir,
-    )
 
 
-    unit_test = UnitTest(model)
+    model = AutoModel.from_pretrained(unit_test_args.model_name_or_path)
 
-    # unit_test.unitTest1({
-    #         "delta_type": "bitfit",
-    #     })
-    # unit_test.unitTest1({
-    #         "delta_type": "lora",
-    #     })
-    unit_test.unitTest1({
-            "delta_type": "adapter",
-        })
+    import torch
+    import copy
+    models = [model, copy.deepcopy(model)]
+
+
+    unit_test = UnitTest(models)
+
+
+    unit_test.unit_test(unit_test_args.test_id, unit_test_args.config_id)
+
+    
     
 
 
 
-    # train_dataset = DRTrainDataset(tokenizer, data_args, shuffle_seed=training_args.seed, cache_dir=data_args.data_cache_dir or model_args.cache_dir)
-    # eval_dataset = DREvalDataset(tokenizer, data_args, cache_dir=data_args.data_cache_dir or model_args.cache_dir) if data_args.eval_path is not None else None
-
-    # tb_callback = TensorBoardCallback()
-
-    # trainer_cls = GCDenseTrainer if training_args.grad_cache else Trainer
-    # trainer = trainer_cls(
-    #     model=model,
-    #     args=training_args,
-    #     tokenizer=tokenizer,
-    #     train_dataset=train_dataset,
-    #     eval_dataset=eval_dataset,
-    #     data_collator=QPCollator(
-    #         tokenizer,
-    #         max_p_len=data_args.p_max_len,
-    #         max_q_len=data_args.q_max_len
-    #     ),
-    #     callbacks=[tb_callback]
-    # )
-    # train_dataset.trainer = trainer
-
-    # trainer.train()
-    # trainer.save_model()
-    # if trainer.is_world_process_zero():
-    #     tokenizer.save_pretrained(training_args.output_dir)
 
 
 if __name__ == "__main__":

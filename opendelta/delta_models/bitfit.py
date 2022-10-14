@@ -146,35 +146,28 @@ class BitFitModel(DeltaBase):
                       ):
         if is_leaf_module(module):
             # if it is a leaf module, add bias to it regardless of its type.
-            if isinstance(module, nn.Linear):
-                self.add_bias_to_linear(module)
+            if isinstance(module, nn.Linear) or isinstance(module, nn.LayerNorm):
+                self.add_bias_to_modules_have_bias_or_known_type(module)
             else:
                 # for example, layer_norms, lm_heads.
                 self.add_bias_to_others(module)
         else:
-            # for the non-leaf modules, by default it will add bias only to the linear submodules.
             for n, c in module.named_modules():
-                if isinstance(c, nn.Linear) or isinstance(c, nn.LayerNorm):
-                    if c.bias is None:
-                        bias = nn.Parameter(torch.empty(c.out_features), requires_grad=True)
-                        c.register_parameter('bias', bias)
-                        self._reset_bias_parameters(c)
-                        self.delta_params.append(bias)
-                    else:
-                        c.bias.requires_grad = True
-                        self.delta_params.append(c.bias)
-                else:
-                    pass
+                self.add_bias_to_modules_have_bias_or_known_type(c)
 
-    def add_bias_to_linear(self, c):
-        if c.bias is None:
-            bias = nn.Parameter(torch.empty(c.out_features), requires_grad=True)
-            c.register_parameter('bias', bias)
-            self._reset_bias_parameters(c)
-            self.delta_params.append(bias)
-        else:
+    def add_bias_to_modules_have_bias_or_known_type(self, c):
+        '''If it has bias, unfreeze it. 
+        If it doesn't have bias: if it is Linear of LN, add to it, else pass.
+        '''
+        if 'bias' in [n for n,p in c.named_parameters()]:
             c.bias.requires_grad = True
             self.delta_params.append(c.bias)
+        else:
+            if isinstance(c, nn.Linear) or isinstance(c, nn.LayerNorm): # add bias
+                bias = nn.Parameter(torch.empty(c.out_features), requires_grad=True)
+                c.register_parameter('bias', bias)
+                self._reset_bias_parameters(c)
+                self.delta_params.append(bias)
 
     def add_bias_to_others(self, c):
         new_bias = BiasLayer()

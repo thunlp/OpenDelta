@@ -138,7 +138,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         if self.common_structure and self.structure_mapping is None:
             raise RuntimeError("Using common structure but the structure mapping is None")
 
-    def forward(self, *args, **kwargs) -> "RuntimeError":
+    def forward(self, *args, **kwargs) -> RuntimeError:
         r"""
             .. warning::
 
@@ -198,12 +198,12 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         # create a new key list to avoid recursion.
         backbone_key_list = [key for key, _ in backbone.named_modules()]
         for key in backbone_key_list:
-            if self.find_key(key, modified_modules): 
-                logger.debug("find key: {}".format(key))
+            print(key)
+            if self.find_key(key, modified_modules):
+                print("found!")
                 self.update_module(backbone, key)
         if self._need_pseudo_data:
-            self._pseudo_data_to_instantiate
-            
+            self._pseudo_data_to_instantiate(backbone)
                     
         # mark the paratmers that are the delta parameters for easily displaying the delta_paramters.
         self.mark_as_delta()
@@ -214,7 +214,10 @@ class DeltaBase(nn.Module, SaveLoadMixin):
             self._pseudo_data_to_instantiate_module(backbone)
         else:
             for key in self.structure_mapping.matched_pairs:
-                _, _, submodule = self.find_module(backbone, key)
+                if key == "":
+                    submodule = backbone
+                else:
+                    _, _, submodule = self.find_module(backbone, key)
                 self._pseudo_data_to_instantiate_module(submodule)
 
     def mark_as_delta(self, module: nn.Module=None,):
@@ -321,14 +324,16 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         for x in self.exclude_modules:
             if key.startswith(x): # start with the excluded key
                 return False
-        if self.common_structure:
-            key = self.structure_mapping.transform(key, strict=False)
+        if self.structure_mapping is not None:
+            key, virtual_key, in_virtual_order = self.structure_mapping.transform(key, strict=False)
+            # currently in_virtual_order not in use, it means that if the common structure designate adding adapter to FFN, it will be add to all submodule of FFN. 
         if not key:
             return False
-        try:
+        if virtual_key is None:
             return endswith_in(key, target_list)
-        except:
-            raise RuntimeError("find_key exception")
+        else:
+            return endswith_in(key, target_list) or endswith_in(virtual_key, target_list)
+
 
     def _pseudo_data_to_instantiate_module(self, module: Optional[nn.Module]=None):
         r"""Some delta model requires a pseudo-data be passed through the model to understand the dimensionality of each tensor in the computation graph.
@@ -648,8 +653,6 @@ class DeltaBase(nn.Module, SaveLoadMixin):
                     state_dict.pop(n)
             return state_dict
         includes = self.trainable_parameters_names(module) # use excludes will have trouble when the model have shared weights
-        # print(includes, "grad:",self.backbone_model.plm.lm_head.weight.requires_grad)
-        # exit()
         if hasattr(module.state_dict, "__wrapped__"):
             raise RuntimeWarning("The forward function might have been wrapped by a decorator, is it intended? Do you freeze the parameters twice?")
         module.state_dict = decorate(module.state_dict, _caller, extras=(includes,), kwsyntax=True) # decorator.decorate helps preserving the functions metadata (signature, etc.).

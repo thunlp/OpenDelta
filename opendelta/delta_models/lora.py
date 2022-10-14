@@ -70,16 +70,17 @@ class LoraModel(DeltaBase):
     Thanks for their `loralib <https://github.com/microsoft/LoRA/tree/main/loralib>`_.
 
     .. note::
+
         In our implementation, we did not use loralib.linear to replace the linear layer of the backbone model.
         Instead, we insert a parallel module into the backbone.
-        In other words, we treat :math:`(W + A^TB) X` as :math:`WX+ A^TBX`, and insert the :math:`A^TBX` as a parallel insertion module.
-        If you want to use the original implementation, please refer to `lora_old.py`
+        In other words, we treat :math:`(W + A^TB) X` as :math:`WX+ A^TBX`, and insert the :math:`A^TBX` as a parallel insertion module. If you want to use the original implementation, please refer to `lora_old.py`
 
     class attributes:
-        - default_modified_modules = ['attn.q', 'attn.v'] According to the paper, they modify q and v matrix in the
-        attention layer. However, other linears can also be modified, and may lead to better performance.
+
+        - default_modified_modules = ['attn.q', 'attn.v'] According to the paper, they modify q and v matrix in the attention layer. However, other linears can also be modified, and may lead to better performance.
 
         .. note::
+        
             modified_modules should point to linear layer. We currently don't support broadcast to all linears in
             a module's child modules.
 

@@ -145,24 +145,23 @@ class SoftPromptModel(DeltaBase):
     you set ``n_token`` <soft> tokens template before the <text_a> will give the same result.
 
     Args:
+
         backbone_model (:obj:`transformers.PretrainedModels`): The backbone model to be modified.
         soft_token_num (:obj:`int`, *optional*): num of new tokens to add in the front of the input.
         init_range (:obj:`float`, *optional*): If initialize new tokens randomly, the random range of uniform distribution.
-        token_init (:obj:`bool`, *optional*, default to :obj:`True`): Whether to initialize the new tokens with tokens of the plm
-        other_expand_ids (:obj:`dict`, *optional*, default to `{"attention_mask":1, "token_type_ids":0}`) The name of
-                        other tokens and its default value that expand along with the input sequence. For example, when
-                        you prepend 100 tokens to the input_ids, the attention_mask should be extended, and the token_type_ids should
-                        be extended as well.
-        modified_modules (:obj:`List[str]`): For prefix tuning, the it must refer to an attention layer (Currently, only
-                        the implemented ones)
-        unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen
-                         together with the prefix parameters.
+        token_init (:obj:`bool`, *optional*, default to :obj:`True`): Whether to initialize the new tokens with tokens of the PLM.
+        other_expand_ids (:obj:`dict`, *optional*, default to ``{'attention_mask':1, 'token_type_ids':0}``): The name of other tokens and its default value that expand along with the input sequence. For example, when you prepend 100 tokens to the input_ids, the attention_mask should be extended, and the token_type_ids should be extended as well.
+        modified_modules (:obj:`List[str]`): For prefix tuning, the it must refer to an attention layer (Currently, only the implemented ones).
+        unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen together with the prefix parameters.
         common_structure (:obj:`bool`): whether using name-based addressing with a common structure mapping.
 
+
     """
+
     config_class = SoftPromptConfig
     delta_type = "soft_prompt"
     default_modified_modules = ["root"]  # not used
+    _need_pseudo_data = False
     def __init__(self,
                  backbone_model: nn.Module,
                  soft_token_num=100,
@@ -211,9 +210,7 @@ class SoftPromptModel(DeltaBase):
 
     def update_module(self):
         soft_prompt_layer = self.new_module_like(self.raw_embedding)
-        self.insert_sequential_module(self.backbone_model.get_encoder() if self.backbone_model.config.is_encoder_decoder else self.backbone_model,
-                                          delta_module=soft_prompt_layer,
-                                          delta_name="soft_prompt_layer"  )
+        self.insert_sequential_module(self.backbone_model.get_encoder() if self.backbone_model.config.is_encoder_decoder else self.backbone_model,delta_module=soft_prompt_layer,delta_name="soft_prompt_layer"  )
 
     def new_module_like(self, module):
         module_device = get_device(module)

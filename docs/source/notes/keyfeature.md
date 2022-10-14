@@ -38,7 +38,7 @@ We use three key functions to achieve the modifications to the backbone model ou
    - **parallel insertion**
    
     Adapters can also be used in a parallel fashion (see [Paper](https://arxiv.org/abs/2110.04366)).
-    For these methods, use [insert_parallel_module](opendelta.basemodel.DeltaBase.insert_parrellel_module) interface.
+    For these methods, use [insert_parallel_module](opendelta.basemodel.DeltaBase.insert_parallel_module) interface.
 
 
 :::{admonition} Doc-preserving Insertion
