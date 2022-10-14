@@ -33,6 +33,7 @@ OpenDelta is a toolkit for parameter-efficient tuning methods (we dub it as *del
 
 ## News
 - **2022.10.14** Release v0.3.0. We make the usage of default configurations of each delta tuning methods (i.e., the position they are attached) more friendly! If a custom model has our supported models as submodules inside, the default configuration is also available. Other key changes can be seen in [Update Log](file:///Users/hsd/codes/opendelta_doc/OpenDelta/docs/build/html/notes/update.html#version-0-3-0)
+- **2022.10.10** Merge a long-developed branch v0.2.4 into the master branch. Key updates are (1) the an example unifying the delta tuning paradigm and the prompt-tuning paradigm; (2) and support for [delta centers](https://www.openbmb.org/toolKits/deltacenter), whose webpage is still under construction. Details can be seen in [Update Log](file:///Users/hsd/codes/opendelta_doc/OpenDelta/docs/build/html/notes/update.html#version-0-2-4)
 - **2022.03.24** We notice several bugs in Soft Prompt Tuning and Prefix Tuning, mainly due to their need to customize attention ids, token_type_ids, we are fixing it! Currently, please use the other methods since they are stabler and better in performance. 
 - **2022.03.20** Add a [colab example](https://colab.research.google.com/drive/1uAhgAdc8Qr42UKYDlgUv0f7W1-gAFwGo?usp=sharing) to illustrate efficient training and space-saving multitask-serving.
 - **2022.03.20** A new pip version released.
