@@ -198,9 +198,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         # create a new key list to avoid recursion.
         backbone_key_list = [key for key, _ in backbone.named_modules()]
         for key in backbone_key_list:
-            print(key)
             if self.find_key(key, modified_modules):
-                print("found!")
                 self.update_module(backbone, key)
         if self._need_pseudo_data:
             self._pseudo_data_to_instantiate(backbone)
@@ -324,6 +322,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         for x in self.exclude_modules:
             if key.startswith(x): # start with the excluded key
                 return False
+        virtual_key, in_virtual_order = None, None
         if self.structure_mapping is not None:
             key, virtual_key, in_virtual_order = self.structure_mapping.transform(key, strict=False)
             # currently in_virtual_order not in use, it means that if the common structure designate adding adapter to FFN, it will be add to all submodule of FFN. 
