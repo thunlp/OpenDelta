@@ -83,7 +83,7 @@ pip install -r requirements.txt && python setup.py develop
 ```
 
 ## Must Try
-The following codes and comments walk you through the key functionality of OpenDelta. It is also in [must_try.py](https://github.com/thunlp/OpenDelta/tree/main/unittest/must_try.py)
+The following codes and comments walk you through the key functionality of OpenDelta. It is also in [must_try.py](https://github.com/thunlp/OpenDelta/tree/main/examples/unittest/must_try.py)
 
 ```python
 # use tranformers as usual.
