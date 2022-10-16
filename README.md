@@ -83,13 +83,14 @@ pip install -r requirements.txt && python setup.py develop
 ```
 
 ## Must Try
-The follow codes and comments walk you through the key functionality of OpenDelta.
+The following codes and comments walk you through the key functionality of OpenDelta.
 
 ```python
 # use tranformers as usual.
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 t5 = AutoModelForSeq2SeqLM.from_pretrained("t5-large")
 t5_tokenizer = AutoTokenizer.from_pretrained("t5-large")
+# A running example
 inputs_ids = t5_tokenizer.encode("Is Harry Poter wrtten by JKrowling", return_tensors="pt")
 t5_tokenizer.decode(t5.generate(inputs_ids)[0]) 
 # >>> '<pad><extra_id_0>? Is it Harry Potter?</s>'
@@ -99,9 +100,9 @@ t5_tokenizer.decode(t5.generate(inputs_ids)[0])
 from opendelta import AutoDeltaModel, AutoDeltaConfig
 # use existing delta models from DeltaCenter
 delta = AutoDeltaModel.from_finetuned("thunlp/Spelling_Correction_T5_LRAdapter_demo", backbone_model=t5)
-# freeze the backbone model except the delta models.
+# freeze the whole backbone model except the delta models.
 delta.freeze_module()
-# see the change
+# visualize the change
 delta.log()
 
 
@@ -109,8 +110,9 @@ t5_tokenizer.decode(t5.generate(inputs_ids)[0])
 # >>> <pad> Is Harry Potter written by JK Rowling?</s>
 
 
-# Now save the delta models, not the whole backbone model to tmp
+# Now save merely the delta models, not the whole backbone model, to tmp/
 delta.save_finetuned(".tmp")
+import os; os.listdir(".tmp")
 # >>>  The state dict size is 1.443 MB
 # >>>  We encourage users to push their final and public models to delta center to share them with the community!
 
@@ -127,7 +129,7 @@ delta1.detach()
 t5_tokenizer.decode(t5.generate(inputs_ids)[0])  
 # >>> '<pad><extra_id_0>? Is it Harry Potter?</s>'
 
-# use default configuration for cunstomized wrapped models which have PLMs inside.
+# use default configuration for cunstomized wrapped models which have PLMs inside. This is a common need for users. 
 import torch.nn as nn
 class WrappedModel(nn.Module):
   def __init__(self, inner_model):
