@@ -62,7 +62,7 @@ def matvec_product(W: torch.Tensor, x: torch.Tensor,
     else: 
        H = kronecker_product_einsum_batched(phm_rule, W).sum(0)
 
-    y = torch.matmul(input=x, other=H)
+    y = torch.matmul(input=x.to(H.dtype), other=H).to(x.dtype)
     if bias is not None:
         y += bias
     return y

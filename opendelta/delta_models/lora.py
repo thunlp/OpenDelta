@@ -137,15 +137,17 @@ class LoraModel(DeltaBase):
         pass
 
     def new_module_like(self, child_module):
-        if isinstance(child_module, nn.Linear):
-            in_features, out_features = child_module.in_features, child_module.out_features
-            new_module = LowRankLinear(in_features = in_features,
-                                     out_features = out_features,
-                                     weight = child_module.weight,
-                                     r=self.lora_r,
-                                     lora_alpha=self.lora_alpha,
-                                     lora_dropout=self.lora_dropout)
-            self.delta_modules.append(new_module)
-        else:
-            raise NotImplementedError
+        in_features, out_features = child_module.in_features, child_module.out_features
+        new_module = LowRankLinear(in_features = in_features,
+                                    out_features = out_features,
+                                    weight = child_module.weight,
+                                    r=self.lora_r,
+                                    lora_alpha=self.lora_alpha,
+                                    lora_dropout=self.lora_dropout)
+        try:
+            import bmtrain as bmt
+            new_module = bmt.BMTrainModelWrapper(new_module)
+        except:
+            pass
+        self.delta_modules.append(new_module)
         return new_module

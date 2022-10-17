@@ -93,6 +93,13 @@ class HyperComplexAdapterLayer(nn.Module):
                                     phm_init_range=self.phm_init_range,
                                     kronecker_prod=self.kronecker_prod).to(self.device)
         self.instantiated = True
+        try:
+            import bmtrain as bmt
+            self.activation = bmt.BMTrainModelWrapper(self.activation)
+            self.down_sampler = bmt.BMTrainModelWrapper(self.down_sampler)
+            self.up_sampler = bmt.BMTrainModelWrapper(self.up_sampler)
+        except:
+            pass
 
 
     def post_forward(self, output):

@@ -2,6 +2,7 @@ from typing import Optional, Union
 from opendelta.utils.signature import get_arg_names_inside_func
 from opendelta.utils.name_based_addressing import *
 from opendelta.basemodel import DeltaBase, is_leaf_module
+from opendelta.utils.cuda import get_device, get_dtype
 import torch.nn as nn
 
 import torch
@@ -28,17 +29,24 @@ class BitFitConfig(BaseDeltaConfig):
                 setattr(self, arg_name, locals()[arg_name])
 
 class BiasLayer(nn.Module):
-    def __init__(self, init_method="zero"):
+    def __init__(self, init_method="zero", dtype=None, device=None):
         super().__init__()
         self.init_method=init_method
         self.instantiated = False
+        self.dtype = dtype
+        self.device = device
 
     def instantiate(self, hidden_dim):
         if self.init_method == "zero":
-            self.bias = nn.Parameter(torch.zeros(hidden_dim))
+            self.bias = nn.Parameter(torch.zeros(hidden_dim, dtype=self.dtype, device=self.device))
         else:
             raise NotImplementedError
         self.instantiated = True
+        try:
+            import bmtrain as bmt
+            self.bias = bmt.BMTrainModelWrapper(self.bias)
+        except:
+            pass
 
     def post_forward(self, output):
         r"""Presuming the first argument is the tensor to add bias along the last dimension.
@@ -145,7 +153,7 @@ class BitFitModel(DeltaBase):
                       ):
         if is_leaf_module(module):
             # if it is a leaf module, add bias to it regardless of its type.
-            if isinstance(module, nn.Linear):
+            if self.check_linear(module):
                 self.add_bias_to_linear(module)
             else:
                 # for example, layer_norms, lm_heads.
@@ -153,34 +161,43 @@ class BitFitModel(DeltaBase):
         else:
             # for the non-leaf modules, by default it will add bias only to the linear submodules.
             for n, c in module.named_modules():
-                if isinstance(c, nn.Linear):
-                    if c.bias is None:
-                        bias = nn.Parameter(torch.empty(c.out_features), requires_grad=True)
-                        c.register_parameter('bias', bias)
-                        self._reset_bias_parameters(c)
-                        self.delta_params.append(bias)
-                    else:
-                        c.bias.requires_grad = True
-                        self.delta_params.append(c.bias)
+                if self.check_linear(c):
+                    self.add_bias_to_linear(c)
                 else:
                     pass
 
     def add_bias_to_linear(self, c):
         if c.bias is None:
             bias = nn.Parameter(torch.empty(c.out_features), requires_grad=True)
-            c.register_parameter('bias', bias)
             self._reset_bias_parameters(c)
+            try:
+                import bmtrain as bmt
+                bias = bmt.BMTrainModelWrapper(bias)
+            except:
+                pass
+            c.register_parameter('bias', bias)
             self.delta_params.append(bias)
         else:
             c.bias.requires_grad = True
             self.delta_params.append(c.bias)
 
     def add_bias_to_others(self, c):
-        new_bias = BiasLayer()
+        new_bias = BiasLayer(dtype=get_dtype(c), device=get_device(c))
         self.insert_sequential_module(c, delta_module=new_bias, delta_name="bitfit") # name shouldn't be `bias` here, since
                                         # the name `bias` is reserved for some module such as  roberta's LayerNorm.
         self.delta_modules.append(new_bias)
 
+    def check_linear(self, m):
+        if isinstance(m, nn.Linear):
+            return True
+        else:
+            try:
+                from model_center.layer import Linear
+                if isinstance(m, Linear):
+                    return True
+            except:
+                pass
+        return False
 
 
     @staticmethod

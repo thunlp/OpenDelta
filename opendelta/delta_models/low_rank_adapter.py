@@ -69,6 +69,13 @@ class LowRankAdapter(nn.Module):
                                         rank=self.low_rank_rank).to(self.device)
 
         self.instantiated = True
+        try:
+            import bmtrain as bmt
+            self.activation = bmt.BMTrainModelWrapper(self.activation)
+            self.down_sampler = bmt.BMTrainModelWrapper(self.down_sampler)
+            self.up_sampler = bmt.BMTrainModelWrapper(self.up_sampler)
+        except:
+            pass
 
     def post_forward(self, output):
         r""" Get the hidden_states from the PLM's layer output, pass it into the low-rank adapter,
@@ -87,7 +94,6 @@ class LowRankAdapter(nn.Module):
             self.hidden_dim = hiddens.shape[-1]
             logger.debug(f"Got hidden dim hidden_dim {self.hidden_dim}")
             self.instantiate(hidden_dim=self.hidden_dim)
-
 
         z = self.down_sampler(hiddens)
         z = self.activation(z)
