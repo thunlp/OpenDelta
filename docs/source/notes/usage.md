@@ -12,7 +12,7 @@ model = AutoModelForSequenceClassification.from_pretrained("facebook/bart-base")
 ## STEP 2: Add delta modules
 We provide two alternatives to add the delta modules.
 ### 2.1 Modification based on visualization
-Suppose we want to make the feedforward layer of each block as our [modification target module](target_module),
+Suppose we want to make the feedforward layer of each block as our [modification target module](targetmodules),
 We should first know what is the name of the feedforward layer in the BART model by visualization. <img src="../imgs/hint-icon-2.jpg" height="30px"> *For more about visualization, see [Visualization](visualization).*
 
 ```python
@@ -43,19 +43,12 @@ delta_model = AdapterModel(backbone_model=model, modified_modules=['fc2'], bottl
 delta_model.log() # This will visualize the backbone after modification and other information.
 ```
 
-(target_module)=
-:::{admonition} Target module
-:class: note
-For different delta methods, the operation for the modification target is different.
-- Adapter based method: Insert at the target module's forward function.
-- BitFit: Add bias to all allowed position of the target module.
-- Lora: Substitute the all the linear layers of the target module with [Lora.Linear](https://github.com/microsoft/LoRA/blob/main/loralib/layers.py#L92).
-:::
+
 
 ### 2.2 Use the default modification.
 We also provide the default modifications of each delta methods for some commonly used PTMs (e.g., BERT, RoBERTA, DistilBERT, T5, GPT2), so the users don't need to specify the submodules to modify.
 
-The default modifications is achieved by a [common_structure mapping](commonstructure), that is, use the mapping a name of a module to the it's name on a common transformer structure. <img src="../imgs/hint-icon-2.jpg" height="30px">  *For details about the default modification, see [Unified Name Convention](unifyname)*
+The default modifications is achieved by mapping a name of a submodule to it's name on a common transformer structure. <img src="../imgs/hint-icon-2.jpg" height="30px">  *For details about the common structure mapping, see [Common Structure Mapping](commonstructure)*
 
 
 
@@ -97,7 +90,7 @@ The performance may vary due to positional differences, but there is no academic
 
 :::{admonition} Favored Configurations
 :class: tip
-Feel confused about the flexibility that OpenDelta brings? NO WORRY! We will add [Favored Configurations](favoredconfiguration) soon.
+Feel confused about the flexibility that OpenDelta brings? Currently you can refer to the papers for their configuration. And We will add [Favored Configurations](favoredconfiguration) soon.
 :::
 
 ## STEP 3: Freezing parameters

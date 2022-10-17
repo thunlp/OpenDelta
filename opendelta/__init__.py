@@ -1,5 +1,12 @@
 
-__version__ = "0.0.1"
+__version__ = "0.3.0"
+
+class GlobalSetting:
+    def __init__(self):
+        self.axis_order = [0,1,2]
+
+
+global_setting = GlobalSetting()
 
 from .delta_configs import BaseDeltaConfig
 from .utils import logging
@@ -15,3 +22,8 @@ from .delta_models.prefix import PrefixModel
 from .delta_models.soft_prompt import SoftPromptModel
 from .delta_models.low_rank_adapter import LowRankAdapterModel
 from .utils.visualization import Visualization
+
+
+
+def set_axis_order(axis_order=[0,1,2]):
+    setattr(global_setting, "axis_order", axis_order)

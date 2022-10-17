@@ -1,5 +1,6 @@
 from typing import Union
 import torch.nn as nn
+import torch
 
 def get_device(module : Union[nn.Module, nn.Parameter]):
     if not (isinstance(module, nn.Module) \
@@ -15,6 +16,14 @@ def get_device(module : Union[nn.Module, nn.Parameter]):
             return params_devices[0]
         else:
             raise RuntimeError("The module is paralleled acrossed device, please get device in a inner module")
+
+
+def move_dict_to_cuda(dict_of_tensor, device):
+    for key in dict_of_tensor:
+        if isinstance(dict_of_tensor[key], torch.Tensor):
+            dict_of_tensor[key] = dict_of_tensor[key].to(device)
+    return dict_of_tensor
+
 
 
 # unitest, should be removed later

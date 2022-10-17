@@ -3,7 +3,7 @@
 
 <img src="https://s4.ax1x.com/2022/02/14/Hy7lAf.png" width="350px">
 
-**An Open-Source Framework for Paramter Efficient Tuning.**
+**An Open-Source Framework for Paramter-Efficient Tuning (Delta Tuning).**
 
 ------
 
@@ -21,14 +21,23 @@
 
 ![version](https://img.shields.io/badge/version-0.0.1-blue)
 
+
 ## Overview
 
-OpenDelta is a toolkit for parameter efficient methods (we dub it as *delta tuning*), by which users could flexibly assign (or add) a small amount parameters to update while keeping the most paramters frozen. By using OpenDelta, users could easily implement prefix-tuning, adapters, Lora, or any other types of delta tuning with preferred PTMs.
+OpenDelta is a toolkit for parameter-efficient tuning methods (we dub it as *delta tuning*), by which users could flexibly assign (or add) a small amount parameters to update while keeping the most paramters frozen. By using OpenDelta, users could easily implement prefix-tuning, adapters, Lora, or any other types of delta tuning with preferred PTMs.
 
-Our repo is tested on Python 3.8 and PyTorch 1.9.0. Lower version may also be supported. 
+- Our repo is tested on Python 3.=-0 and PyTorch 1.9.0. Lower version may also be supported. 
 
-**A demo of using Opendelta to modify the PLM (E.g., BART).**
+- **A demo of using Opendelta to modify the PLM (E.g., BART).**
 ![How PLM changes using Delta-tuning](docs/source/imgs/demo.gif)
+
+## News
+- **2022.10.14** Release v0.3.0. We make the usage of default configurations of each delta tuning methods (i.e., the position they are attached) more friendly! If a custom model has our supported models as submodules inside, the default configuration is also available. Other key changes can be seen in [Update Log](https://opendelta.readthedocs.io/en/latest/notes/update.html#version-0-3-0)
+- **2022.10.10** Merge a long-developed branch v0.2.4 into the master branch. Key updates are (1) the an example unifying the delta tuning paradigm and the prompt-tuning paradigm; (2) and support for [Delta Center](https://www.openbmb.org/toolKits/deltacenter), whose webpage is still under construction. Details can be seen in [Update Log](https://opendelta.readthedocs.io/en/latest/notes/update.html#version-0-2-4)
+- **2022.03.24** We notice several bugs in Soft Prompt Tuning and Prefix Tuning, mainly due to their need to customize attention ids, token_type_ids, we are fixing it! Currently, please use the other methods since they are stabler and better in performance. 
+- **2022.03.20** Add a [colab example](https://colab.research.google.com/drive/1uAhgAdc8Qr42UKYDlgUv0f7W1-gAFwGo?usp=sharing) to illustrate efficient training and space-saving multitask-serving.
+- **2022.03.20** A new pip version released.
+- **2022.02.16** Support [regular expression](https://opendelta.readthedocs.io/en/latest/notes/namebasedaddr.html#regexexpr) in named-based addressing. 
 
 ## Installation
 create a virtualenv (optional)
@@ -60,22 +69,97 @@ cd OpenDelta
 python setup.py install
 ```
 
-#### Option 2:  If you want to modify the code, run
+#### Option 2:  If you want to modify the code or keep the repo updated by git clone, run
 ```shell
 python setup.py develop
 ```
 
-## Must Try
+#### Tips
+- If you want to use mirror for installing the packages, please change the `index_url` in [setup.cfg](setup.cfg)
 
-```python
-from transformers import AutoModelForSeq2SeqLM
-t5 = AutoModelForSeq2SeqLM.from_pretrained("t5-base")
-from opendelta import AutoDeltaModel
-delta = AutoDeltaModel.from_finetuned("DeltaHub/lora_t5-base_mrpc", backbone_model=t5)
-delta.log()
+- If you encounter network error using setup.py, please firstly install the dependencies via
+```shell
+pip install -r requirements.txt && python setup.py develop
 ```
 
-## Verified Supported Models
+## Must Try
+The following codes and comments walk you through the key functionality of OpenDelta. It is also in [must_try.py](https://github.com/thunlp/OpenDelta/tree/main/examples/unittest/must_try.py)
+
+```python
+# use tranformers as usual.
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+t5 = AutoModelForSeq2SeqLM.from_pretrained("t5-large")
+t5_tokenizer = AutoTokenizer.from_pretrained("t5-large")
+# A running example
+inputs_ids = t5_tokenizer.encode("Is Harry Poter wrtten by JKrowling", return_tensors="pt")
+t5_tokenizer.decode(t5.generate(inputs_ids)[0]) 
+# >>> '<pad><extra_id_0>? Is it Harry Potter?</s>'
+
+
+# use existing delta models
+from opendelta import AutoDeltaModel, AutoDeltaConfig
+# use existing delta models from DeltaCenter
+delta = AutoDeltaModel.from_finetuned("thunlp/Spelling_Correction_T5_LRAdapter_demo", backbone_model=t5)
+# freeze the whole backbone model except the delta models.
+delta.freeze_module()
+# visualize the change
+delta.log()
+
+
+t5_tokenizer.decode(t5.generate(inputs_ids)[0]) 
+# >>> <pad> Is Harry Potter written by JK Rowling?</s>
+
+
+# Now save merely the delta models, not the whole backbone model, to tmp/
+delta.save_finetuned(".tmp")
+import os; os.listdir(".tmp")
+# >>>  The state dict size is 1.443 MB
+# >>>  We encourage users to push their final and public models to delta center to share them with the community!
+
+
+# reload the model from local url and add it to pre-trained T5.
+t5 = AutoModelForSeq2SeqLM.from_pretrained("t5-large")
+delta1 = AutoDeltaModel.from_finetuned(".tmp", backbone_model=t5)
+import shutil; shutil.rmtree(".tmp") # don't forget to remove the tmp files. 
+t5_tokenizer.decode(t5.generate(inputs_ids)[0]) 
+# >>> <pad> Is Harry Potter written by JK Rowling?</s>
+
+# detach the delta models, the model returns to the unmodified status.
+delta1.detach()
+t5_tokenizer.decode(t5.generate(inputs_ids)[0])  
+# >>> '<pad><extra_id_0>? Is it Harry Potter?</s>'
+
+# use default configuration for cunstomized wrapped models which have PLMs inside. This is a common need for users. 
+import torch.nn as nn
+class WrappedModel(nn.Module):
+  def __init__(self, inner_model):
+    super().__init__()
+    self.inner = inner_model
+  def forward(self, *args, **kwargs):
+    return self.inner(*args, **kwargs)
+
+wrapped_model = WrappedModel(WrappedModel(t5))
+
+# say we use LoRA
+delta_config = AutoDeltaConfig.from_dict({"delta_type":"lora"})
+delta2 = AutoDeltaModel.from_config(delta_config, backbone_model=wrapped_model)
+delta2.log()
+# >>> root
+#       -- inner
+#          -- inner
+#             ...
+#             ... lora_A:[8,1024], lora_B:[1024,8]
+delta2.detach()
+
+# use a not default configuration
+# say we add lora to the last four layer of the decoder of t5, with lora rank=5
+delta_config3 = AutoDeltaConfig.from_dict({"delta_type":"lora", "modified_modules":["[r]decoder.*((20)|(21)|(22)|(23)).*DenseReluDense\.wi"], "lora_r":5})
+delta3 = AutoDeltaModel.from_config(delta_config3, backbone_model=wrapped_model)
+delta3.log()
+
+```
+
+## Verified Default Configurations  
 
 - **You can try to use OpenDelta on *any* backbone models based on PyTorch.**  
 - However, with small chances thatThe interface of the submodules of the backbone model is not supported. Therefore we verified some commonly
@@ -97,12 +181,8 @@ used models that OpenDelta are sure to support.
 | T5-3b(parallel)| ✅  | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  |
 | Deberta-v2     | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  |     |     |
 | CTRL           | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  |     |     |
-| ViT            | ✅  |     |    |     |     |      |   |     |     |
 
 
-## Performance Checked Combination
 
-Google sheet [here](https://docs.google.com/spreadsheets/d/1BIVa8ocAPga-u7rBOXLYaTfaJSjI1dWfwohmLjmFDrY/edit?usp=sharing)
 
-Subject to change at any moment. 
 

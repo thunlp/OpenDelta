@@ -4,10 +4,10 @@ from collections import namedtuple
 def signature(f):
     r"""Get the function f 's input arguments. A useful gadget
     when some function slot might be instantiated into multiple functions.
-    
+
     Args:
         f (:obj:`function`) : the function to get the input arguments.
-    
+
     Returns:
         namedtuple : of args, default, varargs, keywords, respectively.s
 
@@ -34,7 +34,7 @@ def signature(f):
     ] or None
     argspec = namedtuple('Signature', ['args', 'defaults',
                                         'varargs', 'keywords'])
-    return argspec(args, defaults, varargs, keywords) 
+    return argspec(args, defaults, varargs, keywords)
 
 def get_arg_names(f):
     r""" Get a functions argument name, remove the ``self`` argument
@@ -43,6 +43,7 @@ def get_arg_names(f):
     if args[0] == "self":
         args = args[1:]
     return args
+
 
 
 def get_arg_names_inside_func(func):
