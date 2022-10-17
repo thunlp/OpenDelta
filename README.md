@@ -26,7 +26,7 @@
 
 OpenDelta is a toolkit for parameter-efficient tuning methods (we dub it as *delta tuning*), by which users could flexibly assign (or add) a small amount parameters to update while keeping the most paramters frozen. By using OpenDelta, users could easily implement prefix-tuning, adapters, Lora, or any other types of delta tuning with preferred PTMs.
 
-- The last version of OpenDelta is tested on Python==3.8.13, PyTorch==1.12.1, transformers==4.22.2. Other versions are likely to be supported as well. If you encounter bugs when using your own package versions, please raise an issue, we will look into it as soon as possible. 
+- The latest version of OpenDelta is tested on Python==3.8.13, PyTorch==1.12.1, transformers==4.22.2. Other versions are likely to be supported as well. If you encounter bugs when using your own package versions, please raise an issue, we will look into it as soon as possible. 
 
 - **A demo of using Opendelta to modify the PLM (E.g., BART).**
 ![How PLM changes using Delta-tuning](docs/source/imgs/demo.gif)
