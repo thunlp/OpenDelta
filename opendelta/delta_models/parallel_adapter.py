@@ -5,12 +5,9 @@ from opendelta.utils.signature import get_arg_names_inside_func
 from opendelta.utils.name_based_addressing import *
 from opendelta.utils.cuda import get_device
 from opendelta.basemodel import DeltaBase
-import loralib as lora
 import torch.nn as nn
 import torch
-import math
 from opendelta.delta_models.layers.activations import Activations
-import inspect
 from opendelta import BaseDeltaConfig
 import opendelta.utils.logging as logging
 logger = logging.get_logger(__name__)
@@ -147,13 +144,16 @@ class ParallelAdapterModel(DeltaBase):
 
     """
     config_class = ParallelAdapterConfig
-    delta_type = "adapter"
-    default_modified_modules = ["attn", "attn", "ff.w1", "ff.w2"]
+    delta_type = "parallel_adapter"
+    default_modified_modules = ["attn@", "attn@", "ff@.w1@", "ff@.w2@"]
+    # default_modified_modules = ["attn", "attn", "ff.w1", "ff.w2"]
+    _need_pseudo_data = True
     def __init__(self,
                  backbone_model: nn.Module, 
                  bottleneck_dim: Optional[int]=24, 
                  non_linearity: Optional[str]='gelu_new',
                  modified_modules: Optional[bool] = None,
+                 exclude_modules: Optional[List[str]] = None,
                  unfrozen_modules: Optional[bool] = None,
                  common_structure: Optional[bool] = None,
                  interactive_modify: Optional[Union[bool, int]] = False,
@@ -161,6 +161,7 @@ class ParallelAdapterModel(DeltaBase):
         DeltaBase.__init__(self, 
                            backbone_model, 
                            modified_modules=modified_modules,
+                           exclude_modules=exclude_modules,
                            unfrozen_modules=unfrozen_modules,
                            common_structure=common_structure,
                            interactive_modify=interactive_modify,

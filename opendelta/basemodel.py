@@ -372,7 +372,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         except:
             _auto_dummy_fail = True
         if _auto_dummy_fail:  
-            raise AttributeError(f"\nThe {self.__class__.__name__} requires a pseudo-data to be passed through the model to understand the dimensionality of each tensor in the computation graph. \nThe automatically created dummy inputs failed.\nThe `dummy_inputs` can be any data that make `backbone_model.forward(**dummy_inputs)` succeed. Only the form and shape of the `dummy_inputs` matter.\n\tTo set dummy_inputs for your model, please use: `setattr(backbone_model, 'dummy_inputs', some_dummy_inputs)` before initializing `{self.__class__.__name__}` ")
+            raise AttributeError(f"\n\tThe {self.__class__.__name__} requires a dummy_inputs to be passed through the model to understand the dimensionality of each tensor in the computation graph. \n\t The {module.__class__.__name__} Class has no dummy_inputs, and automatically created dummy_inputs failed.\n\t Refer to `https://opendelta.readthedocs.io/en/latest/notes/faq.html` for detail.")
            
 
 
@@ -804,13 +804,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
 
                     if _delta_info['method'] == "replace":
                         setattr(submodule, _delta_info["child_name"], _delta_info['org_module'])
-                    elif _delta_info['method'] == "insert_sequential":
-                        if hasattr(submodule.forward, "__wrapped__"):
-                            submodule.forward = submodule.forward.__wrapped__
-                            delattr(submodule, _delta_info["delta_name"])
-                        else:
-                            raise AttributeError("submodule {}'s forward has no attribute __wrapped__. It's not a wrapped function.".format(name))
-                    elif _delta_info['method'] == "insert_parallel":
+                    elif _delta_info['method'] in ["sequential", "before", "after", "parallel"]:
                         if hasattr(submodule.forward, "__wrapped__"):
                             submodule.forward = submodule.forward.__wrapped__
                             delattr(submodule, _delta_info["delta_name"])
