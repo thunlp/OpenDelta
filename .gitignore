@@ -55,6 +55,7 @@ t.sh
 **/outputs/
 
 
-unittest/outputs/
-unittest/tmp/
-**/tmp/
+**/unittest/**
+!unittest/**.py
+!unittest/**.sh
+

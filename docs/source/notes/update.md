@@ -1,5 +1,8 @@
 # Update Logs and Known Issues
 
+## Version 0.3.1
+- We update [must_try.py](https://github.com/thunlp/OpenDelta/tree/main/examples/unittest/must_try.py) for a simple introduction of the core functionality of OpenDelta.
+
 
 ## Version 0.3.0
 ### Updates:

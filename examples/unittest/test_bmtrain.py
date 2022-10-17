@@ -1,28 +1,46 @@
-
-
-
-
 import time
-import random
-import torch
-import bmtrain as bmt
-import numpy as np
 import os
-import csv
+
+import torch
+import numpy as np
+from sklearn.metrics import accuracy_score, recall_score, f1_score
+
+import bmtrain as bmt
 
 from model_center import get_args
-from model_center.model import CPM2
-from model_center.tokenizer import CPM2Tokenizer
-from model_center.dataset.cpm2dataset import DATASET
+from model_center.model import Bert
+from model_center.tokenizer import BertTokenizer
+from model_center.dataset.bertdataset import DATASET
 from model_center.utils import print_inspect
+from model_center.layer import Linear
 from model_center.dataset import DistributedDataLoader
 
+class BertModel(torch.nn.Module):
+    def __init__(self, args, num_types):
+        super().__init__()
+        self.bert : Bert = Bert.from_pretrained(args.model_config)
+        dim_model = self.bert.input_embedding.dim_model
+        self.dense = Linear(dim_model, num_types)
+        bmt.init_parameters(self.dense)
+
+    def forward(self, *args, **kwargs):
+        pooler_output = self.bert(*args, **kwargs, output_pooler_output=True).pooler_output
+        logits = self.dense(pooler_output)
+        return logits
+
 def get_tokenizer(args):
-    tokenizer = CPM2Tokenizer.from_pretrained(args.model_config)
+    tokenizer = BertTokenizer.from_pretrained(args.model_config)
     return tokenizer
 
 def get_model(args):
-    model = CPM2.from_pretrained(args.model_config)
+    num_types = {
+        "BoolQ" : 2,
+        "CB" : 3,
+        "COPA" : 1,
+        "RTE" : 2,
+        "WiC" : 2,
+    }
+    model = BertModel(args, num_types[args.dataset_name])
     return model
 
 def get_optimizer(args, model):
@@ -96,38 +114,52 @@ def prepare_dataset(args, tokenizer, base_path, dataset_name, rank, world_size):
     splits = ['train', 'dev', 'test']
     dataset = {}
     for split in splits:
-        dataset[split] = DATASET[dataset_name](base_path, split, rank, world_size, tokenizer, args.max_encoder_length, args.max_decoder_length)
-    verbalizer = torch.LongTensor(DATASET[dataset_name].get_verbalizer(tokenizer)).cuda()
-    return dataset, verbalizer
+        dataset[split] = DATASET[dataset_name](base_path, split, rank, world_size, tokenizer, args.max_encoder_length)
+    return dataset
 
 
-def finetune(args, tokenizer, model, optimizer, lr_scheduler, dataset, verbalizer):
+def finetune(args, tokenizer, model, optimizer, lr_scheduler, dataset):
     loss_func = bmt.loss.FusedCrossEntropy(ignore_index=-100)
 
     optim_manager = bmt.optim.OptimManager(loss_scale=args.loss_scale)
     optim_manager.add_optimizer(optimizer, lr_scheduler)
 
-    dataloader = {
-        "train": DistributedDataLoader(dataset['train'], batch_size=args.batch_size, shuffle=True),
-        "dev": DistributedDataLoader(dataset['dev'], batch_size=args.batch_size, shuffle=False),
-        "test": DistributedDataLoader(dataset['test'], batch_size=args.batch_size, shuffle=False),
-    }
+    print_inspect(model, '*')
 
-    for epoch in range(5):
+    for epoch in range(12):
+        dataloader = {
+            "train": DistributedDataLoader(dataset['train'], batch_size=args.batch_size, shuffle=True),
+            "dev": DistributedDataLoader(dataset['dev'], batch_size=args.batch_size, shuffle=False),
+        }
+
         model.train()
         for it, data in enumerate(dataloader['train']):
-            enc_input = data["enc_input"]
-            enc_length = data["enc_length"]
-            dec_input = data["dec_input"]
-            dec_length = data["dec_length"]
-            targets = data["targets"]
-            index = data["index"]
+            if args.dataset_name == 'COPA':
+                input_ids0 = data["input_ids0"]
+                attention_mask0 = data["attention_mask0"]
+                token_type_ids0 = data["token_type_ids0"]
+                input_ids1 = data["input_ids1"]
+                attention_mask1 = data["attention_mask1"]
+                token_type_ids1 = data["token_type_ids1"]
+                labels = data["labels"]
+            else:
+                input_ids = data["input_ids"]
+                attention_mask = data["attention_mask"]
+                token_type_ids = data["token_type_ids"]
+                labels = data["labels"]
 
-            logits = model(enc_input, enc_length, dec_input, dec_length)
-            logits = logits.index_select(dim=-1, index=verbalizer)
-            logits = logits[torch.where(index==1)]
+            torch.cuda.synchronize()
+            st_time = time.time()
 
-            loss = loss_func(logits, targets)
+            if args.dataset_name == 'COPA':
+                logits = torch.cat([
+                    model(input_ids0, attention_mask=attention_mask0, token_type_ids=token_type_ids0),
+                    model(input_ids1, attention_mask=attention_mask1, token_type_ids=token_type_ids1),
+                ], dim=1)
+            else:
+                logits = model(input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids)
+            loss = loss_func(logits.view(-1, logits.shape[-1]), labels.view(-1))
+
             global_loss = bmt.sum_loss(loss).item()
 
             optim_manager.zero_grad()
@@ -137,8 +169,11 @@ def finetune(args, tokenizer, model, optimizer, lr_scheduler, dataset, verbalize
 
             optim_manager.step()
 
+            torch.cuda.synchronize()
+            elapsed_time = time.time() - st_time
+
             bmt.print_rank(
-                "train | epoch {:3d} | Iter: {:6d}/{:6d} | loss: {:.4f} | lr: {:.4e}, scale: {:10.4f} | grad_norm: {:.4f} |".format(
+                "train | epoch {:3d} | Iter: {:6d}/{:6d} | loss: {:.4f} | lr: {:.4e}, scale: {:10.4f} | grad_norm: {:.4f} | time: {:.3f}".format(
                     epoch,
                     it,
                     len(dataloader["train"]),
@@ -146,55 +181,75 @@ def finetune(args, tokenizer, model, optimizer, lr_scheduler, dataset, verbalize
                     lr_scheduler.current_lr,
                     int(optim_manager.loss_scale),
                     grad_norm,
+                    elapsed_time,
                 )
             )
-            # if it % args.inspect_iters == 0: print_inspect(model, "*")
-            # if args.save != None and it % args.save_iters == 0:
-            #     bmt.save(model, os.path.join(args.save, args.save_name+("-%d.pt" % it)))
 
         model.eval()
         with torch.no_grad():
-            acc = 0
-            total = 0
-            for it, data in enumerate(dataloader['dev']):
-                enc_input = data["enc_input"]
-                enc_length = data["enc_length"]
-                dec_input = data["dec_input"]
-                dec_length = data["dec_length"]
-                targets = data["targets"]
-                index = data["index"]
+            for split in ['dev']:
+                pd = []
+                gt = []
+                for it, data in enumerate(dataloader[split]):
+                    if args.dataset_name == 'COPA':
+                        input_ids0 = data["input_ids0"]
+                        attention_mask0 = data["attention_mask0"]
+                        token_type_ids0 = data["token_type_ids0"]
+                        input_ids1 = data["input_ids1"]
+                        attention_mask1 = data["attention_mask1"]
+                        token_type_ids1 = data["token_type_ids1"]
+                        labels = data["labels"]
+                        logits = torch.cat([
+                            model(input_ids0, attention_mask=attention_mask0, token_type_ids=token_type_ids0),
+                            model(input_ids1, attention_mask=attention_mask1, token_type_ids=token_type_ids1),
+                        ], dim=1)
+                    else:
+                        input_ids = data["input_ids"]
+                        attention_mask = data["attention_mask"]
+                        token_type_ids = data["token_type_ids"]
+                        labels = data["labels"]
+                        logits = model(input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids)
 
-                logits = model(enc_input, enc_length, dec_input, dec_length)
-                logits = logits.index_select(dim=-1, index=verbalizer)
-                logits = logits[torch.where(index==1)]
-                logits = logits.argmax(dim=-1)
-            
-                acc += torch.sum(logits == targets).item()
-                total += logits.shape[0]
-                bmt.print_rank(
-                    "dev | epoch {:3d} | Iter: {:6d}/{:6d} | acc: {:6d} | total: {:6d} |".format(
-                        epoch,
-                        it,
-                        len(dataloader["dev"]),
-                        acc,
-                        total,
+                    loss = loss_func(logits.view(-1, logits.shape[-1]), labels.view(-1))
+                    logits = logits.argmax(dim=-1)
+                    pd.extend(logits.cpu().tolist())
+                    gt.extend(labels.cpu().tolist())
+
+                    bmt.print_rank(
+                        "{} | epoch {:3d} | Iter: {:6d}/{:6d} | loss: {:.4f}".format(
+                            split,
+                            epoch,
+                            it,
+                            len(dataloader[split]),
+                            loss,
+                        )
                     )
-                )
-            acc = torch.tensor(acc / total).cuda()
-            acc = bmt.sum_loss(acc).cpu().item()
-            bmt.print_rank(f"dev epoch {epoch}: accuracy: {acc}")
+
+                pd = bmt.gather_result(torch.tensor(pd).int()).cpu().tolist()
+                gt = bmt.gather_result(torch.tensor(gt).int()).cpu().tolist()
+                
+                bmt.print_rank(f"{split} epoch {epoch}:")
+                if args.dataset_name in ["BoolQ", "CB", "COPA", "RTE", "WiC", "WSC"]:
+                    acc = accuracy_score(gt, pd)
+                    bmt.print_rank(f"accuracy: {acc*100:.2f}")
+                if args.dataset_name in ["CB"]:
+                    rcl = f1_score(gt, pd, average="macro")
+                    f1 = recall_score(gt, pd, average="macro")
+                    bmt.print_rank(f"recall: {rcl*100:.2f}")
+                    bmt.print_rank(f"Average F1: {f1*100:.2f}")
+
 
 def main():
     args = initialize()
     tokenizer, model, optimizer, lr_scheduler = setup_model_and_optimizer(args)
-    dataset, verbalizer = prepare_dataset(
+    dataset = prepare_dataset(
         args,
         tokenizer,
-        f"{args.base_path}/down_data/paraphrase",
+        f"{args.base_path}/down_data/superglue/",
         args.dataset_name,
         bmt.rank(), bmt.world_size(),
     )
-    finetune(args, tokenizer, model, optimizer, lr_scheduler, dataset, verbalizer)
+    finetune(args, tokenizer, model, optimizer, lr_scheduler, dataset)
 
 if __name__ == "__main__":
     main()
