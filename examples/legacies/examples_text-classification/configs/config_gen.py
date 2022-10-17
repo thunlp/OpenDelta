@@ -161,6 +161,20 @@ AllConfigs['adapter_roberta-base'].update({
                                 "output_dir": "outputs/adapter/roberta-base/",
                             })
 
+AllConfigs['parallel_adapter_roberta-base'] = copy.deepcopy(BaseConfigs['roberta-base'])
+AllConfigs['parallel_adapter_roberta-base'].update({
+                                "delta_type": "parallel_adapter",
+                                "learning_rate": 3e-4,
+                                "unfrozen_modules": [
+                                    "deltas",
+                                    "layer_norm",
+                                    "final_layer_norm",
+                                    "classifier",
+                                ],
+                                "bottleneck_dim":24,
+                                "output_dir": "outputs/parallel_adapter/roberta-base/",
+                            })
+
 AllConfigs['lora_roberta-base'] = copy.deepcopy(BaseConfigs['roberta-base'])
 AllConfigs['lora_roberta-base'].update({
                                 "delta_type": "lora",
