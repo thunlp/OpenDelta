@@ -26,6 +26,7 @@ from opendelta.utils.data_parallel import new_replicate_for_data_parallel
 from opendelta.utils.cuda import move_dict_to_cuda
 import sys
 
+from opendelta.utils.data_parallel import caller_map
 logger = logging.get_logger(__name__)
 
 def is_leaf_module(module):
@@ -531,7 +532,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         """
         raise NotImplementedError
 
-    def insert_sequential_module(self, module,  delta_module=None, delta_name='delta', strict=False, _delta_info=None):
+    def insert_module(self, module, method='sequential', delta_module=None, delta_name='delta', strict=False, _delta_info=None):
         r"""insert a module (previous not exists in the code base) before/after a module. Specifically, it modifies the forward
         function of the original module to  firstly pass the arguments into the new module's forward function and then pass
         it into the original ones. The new module can also be inserted after the original module with similar mechanism.
@@ -547,15 +548,6 @@ class DeltaBase(nn.Module, SaveLoadMixin):
                                     original delta is passed through ``_delta_info``.
 
         """
-        def _caller(_org_func, org_module, delta_name, *args, **kwargs):
-            args = args[1:] # the first argument here is ``self``
-            delta_module = getattr(org_module, delta_name)
-            if hasattr(delta_module, "pre_forward"):# is not None:
-                args, kwargs = delta_module.pre_forward(*args, **kwargs)
-            ret = _org_func(*args, **kwargs)
-            if hasattr(delta_module, "post_forward"):# is not None:
-                ret = delta_module.post_forward(ret)
-            return ret
 
 
         if strict:
@@ -566,9 +558,9 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         if _delta_info is None:
             if delta_module is None:
                 raise RuntimeError("delta module can't be none to ensure successful replicate of the parent module.")
-
-            _delta_info = {"method": "insert_sequential",
-                        "delta_module": delta_module,
+        
+            _delta_info = {"method": method,
+                        "delta_module": delta_module, 
                         "delta_name": delta_name,
                         "delta_belong": self,
                         "state": "on"}
@@ -580,12 +572,36 @@ class DeltaBase(nn.Module, SaveLoadMixin):
 
         setattr(module, _delta_info['delta_name'], _delta_info["delta_module"])
 
-        new_forward = decorate(module.forward, _caller, extras=(module, _delta_info['delta_name']), kwsyntax=True) # decorator.decorate helps preserving the functions metadata (signature, etc.).
-        module.forward = new_forward.__get__(module, type(module))  # func.__get__(object, type(object)) register a function as an object's method
-        # for DataParallel's copy behavior. Experimental:
-        # may have bugs when module.forward is nestedly wrapped.
-        module._replicate_for_data_parallel = new_replicate_for_data_parallel.__get__(module, type(module))
 
+        if _delta_info["method"] in caller_map.keys():
+            caller = caller_map[_delta_info["method"]]
+            new_forward = decorate(module.forward, caller, extras=(module, _delta_info['delta_name']), kwsyntax=True) # decorator.decorate helps preserving the functions metadata (signature, etc.).
+            module.forward = new_forward.__get__(module, type(module))  # func.__get__(object, type(object)) register a function as an object's method
+            # for DataParallel's copy behavior. Experimental:
+            # may have bugs when module.forward is nestedly wrapped.
+            module._replicate_for_data_parallel = new_replicate_for_data_parallel.__get__(module, type(module)) 
+        else:
+            raise NotImplementedError(f"_delta_info['method']=='{_delta_info['method']}' is not supported")
+
+
+    def insert_sequential_module(self, module, delta_module=None, delta_name='delta', strict=False, _delta_info=None):
+        r"""insert a module (previous not exists in the code base) before/after a module. Specifically, it modifies the forward 
+        function of the original module to  firstly pass the arguments into the new module's forward function and then pass
+        it into the original ones. The new module can also be inserted after the original module with similar mechanism. 
+
+        When implementing the new module , researchers should be aware of the components of arguments of the original module's forward function.
+        
+        Args:
+            module: (:obj:`nn.Module`): The (sub)module to inserted a delta module.
+            delta_module: (:obj:`DeltaBase`): The delta module to be inserted.
+            name: (:obj:`str`, *optional*): The name of the delta in the backbone module.
+            strict: (:obj:`bool`, *optional*): Whether to prohibit modify a modified module.
+            _delta_info (:obj:`Dict`, *optional*): Used in attach(), reattach a delta module to backbone. The info of 
+                                    original delta is passed through ``_delta_info``.
+        
+        """
+        self.insert_module(module, "sequential", delta_module, delta_name, strict, _delta_info)
+                                             
 
     def insert_parallel_module(self, module, delta_module=None, delta_name='delta', strict=False, _delta_info=None):
         """insert a module (previous not exists in the code base) across a module. Specifically, it modifies the forward
@@ -604,41 +620,8 @@ class DeltaBase(nn.Module, SaveLoadMixin):
 
         """
 
-        def _caller(_org_func, org_module, delta_name, *args, **kwargs):
-            args = args[1:] # the first argument here is ``self``
-            delta_module = getattr(org_module, delta_name)
-            ret_1 = _org_func(*args, **kwargs)
-            ret_2 = delta_module.forward(*args, **kwargs)
-            return ret_1 + ret_2
-
-        if strict:
-            if hasattr(module.forward, "__wrapped__"):
-                raise RuntimeWarning("The forward function might have been wrapped by a decorator, is it intended?")
-
-        # record info for plug and unplug and nested wrap
-        if _delta_info is None:
-            if delta_module is None:
-                raise RuntimeError("delta module can't be none to ensure successful replicate of the parent module.")
-
-            _delta_info = {"method": "insert_parallel",
-                        "delta_module": delta_module,
-                        "delta_name": delta_name,
-                        "delta_belong": self,
-                        "state": "on"}
-            self._register_delta_infos(parent_module=module,
-                                    _delta_info = _delta_info)
-        else:
-            delta_module = _delta_info["delta_module"]
-            delta_name = _delta_info["delta_name"]
-
-        setattr(module, _delta_info['delta_name'], _delta_info["delta_module"])
-
-        new_forward = decorate(module.forward, _caller, extras=(module, _delta_info['delta_name']), kwsyntax=True) # decorator.decorate helps preserving the functions metadata (signature, etc.).
-        module.forward = new_forward.__get__(module, type(module))  # func.__get__(object, type(object)) register a function as an object's method
-        # for DataParallel's copy behavior. Experimental:
-        # may have bugs when module.forward is nestedly wrapped.
-        module._replicate_for_data_parallel = new_replicate_for_data_parallel.__get__(module, type(module))
-
+        self.insert_module(module, "parallel", delta_module, delta_name, strict, _delta_info)
+        
 
     def set_active_state_dict(self, module: nn.Module):
         r"""modify the state_dict function of the model (by default, the backbone model) to return only the tunable part.

@@ -49,12 +49,6 @@ class ParallelAdapterLayer(nn.Module):
 
         self.modulelist.add_module("up_proj", nn.Linear(self.bottleneck_dim, self.hidden_dim,  device=self.device))
 
-        # TODO:
-        # If we want to have a layer norm on output, we apply it later after a separate residual connection
-        # This means that we learn a new output layer norm, which replaces another layer norm learned in the bert layer
-        # if self.add_layer_norm_after:
-        #     self.adapter_norm_after = nn.LayerNorm(self.input_size)
-
         self.instantiated = True
         # initialize the weight, which is important for fast convergence and better performance. 
         self.apply(self._init_weight)
@@ -85,19 +79,25 @@ class ParallelAdapterLayer(nn.Module):
             self.instantiate(hidden_dim=self.hidden_dim)
                 
 
-        self.adapter_output = self.modulelist(hiddens) * self.scaled + hiddens # TODO add hiddens?
+        self.adapter_output = self.modulelist(hiddens) * self.scaled
         return args, kwargs
 
-    def post_forward(self, *args, **kwargs):
-        if isinstance(args, tuple):
-            output = args[0]
-        elif isinstance(args, torch.Tensor):
-            output = args
+    def post_forward(self, output, **kwargs):
+        if isinstance(output, tuple):
+            hidden = output[0]
+        elif isinstance(output, torch.Tensor):
+            hidden = output
         else:
             raise TypeError
 
-        modified_output = self.adapter_output + output
-        return modified_output
+        modified_output = self.adapter_output + hidden
+        if isinstance(output, tuple):
+            output = (modified_output,) + output[1:]
+        elif isinstance(output, torch.Tensor):
+            output = modified_output
+        else:
+            raise TypeError
+        return output
     
   
 
@@ -141,7 +141,7 @@ class ParallelAdapterModel(DeltaBase):
         backbone_model (:obj:`transformers.PretrainedModels`): The backbone model to be modified. 
         bottleneck_dim (:obj:`int`): The dimension of the adapter's bottleneck. 
         non_linearity (:obj:`str`): The non linearity of the adapter.
-        modified_modules (:obj:`List[str]`): modules to add parallel adapter. Must be paired. For examples, ["attn", "attn", "ff.w1", "ff.w2"] add one parallel adapter from attn's input to attn's output, and another one from ff.w1's input to ff.w2's output.
+        modified_modules (:obj:`List[str]`): modules to add parallel adapter. Must be paired and have the save order in layer. For examples, ["attn", "attn", "ff.w1", "ff.w2"] add one parallel adapter from attn's input to attn's output, and another one from ff.w1's input to ff.w2's output.
         unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen together with the parallel adapter parameters.
         common_structure (:obj:`bool`): whether using name-based addressing witha common structure mapping.
 
@@ -182,11 +182,13 @@ class ParallelAdapterModel(DeltaBase):
         _, _, ref = self.find_module(module, key)
         if self.ith % 2 == 0:
             adapterlayer = self.new_module_like(ref)
-            self.insert_before_module(ref, delta_module=adapterlayer, delta_name="parallel_adapter")
-        else:
-            adapterlayer = self.delta_moduels[-1]
-            self.insert_after_module(ref, delta_module=adapterlayer, delta_name="parallel_adapter")
+            self.insert_module(ref, "before", delta_module=adapterlayer, delta_name="parallel_adapter")
+        if self.ith % 2 == 1 or self.modified_modules[self.ith] == self.modified_modules[self.ith + 1]:
+            adapterlayer = self.delta_modules[-1]
+            self.insert_module(ref, "after", delta_module=adapterlayer, delta_name="parallel_adapter")
+            self.ith |= 1
         self.ith += 1
+        self.ith %= len(self.modified_modules)
     
     def new_module_like(self, module):
         module_device = get_device(module)
