@@ -31,7 +31,7 @@ def get_requirements():
 with open('README.md', 'r') as f:
     setuptools.setup(
         name = 'opendelta',
-        version = "0.3.0",
+        version = "0.3.1",
         description = "An open source framework for delta learning (parameter efficient learning).",
         long_description=open("README.md", "r", encoding="utf-8").read(),
         long_description_content_type="text/markdown",

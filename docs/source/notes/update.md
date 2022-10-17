@@ -2,6 +2,7 @@
 
 ## Version 0.3.1
 - We update [must_try.py](https://github.com/thunlp/OpenDelta/tree/main/examples/unittest/must_try.py) for a simple introduction of the core functionality of OpenDelta.
+- Thanks to [Weilin Zhao](https://github.com/Achazwl) We merge a long-developed branch parallel_adapter into the main branch.
 
 
 ## Version 0.3.0
@@ -25,4 +26,4 @@
 ## Version 0.2.4
 ### Updates
 - examples/examples_seq2seq and examples/examples_text-classification is depreciated and moved to [legacy](https://github.com/thunlp/OpenDelta/tree/main/examples/legacies)
-- we provide [examples_prompt](https://github.com/thunlp/OpenDelta/tree/main/examples/examples_prompt), as a cleaner and more general framework, which unifies the delta tuning paradigm and the prompt-tuning paradigm. It is still based on [Huggingface Trainers](https://huggingface.co/docs/transformers/main_classes/trainer). In this example framework, the running pipeline is [a unified script](https://github.com/thunlp/OpenDelta/tree/main/examples/examples_prompt/src), the differences in tasks, models, delta tuning models, and even prompt-tuning paradigms are [more modular and be more independent ](https://github.com/thunlp/OpenDelta/tree/main/examples/examples_prompt/backbones). Please try it out!
+- Thanks to [Zhen Zhang](https://github.com/namezhenzhang),  we provide [examples_prompt](https://github.com/thunlp/OpenDelta/tree/main/examples/examples_prompt), as a cleaner and more general framework, which unifies the delta tuning paradigm and the prompt-tuning paradigm. It is still based on [Huggingface Trainers](https://huggingface.co/docs/transformers/main_classes/trainer). In this example framework, the running pipeline is [a unified script](https://github.com/thunlp/OpenDelta/tree/main/examples/examples_prompt/src), the differences in tasks, models, delta tuning models, and even prompt-tuning paradigms are [more modular and be more independent ](https://github.com/thunlp/OpenDelta/tree/main/examples/examples_prompt/backbones). Please try it out!
