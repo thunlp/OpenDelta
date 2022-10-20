@@ -3,6 +3,7 @@
 from collections import OrderedDict
 from multiprocessing.sharedctypes import Value
 import os
+from turtle import back
 from opendelta.delta_configs import BaseDeltaConfig
 from opendelta.utils.model_md5 import gen_model_hash
 from opendelta.utils.signature import get_arg_names, signature
@@ -23,17 +24,17 @@ from opendelta.utils.structure_mapping import CommonStructureMap
 from opendelta.utils.interactive.web import interactive
 from opendelta.utils.data_parallel import new_replicate_for_data_parallel
 from opendelta.utils.cuda import move_dict_to_cuda
+import sys
 
+from opendelta.utils.data_parallel import caller_map
 logger = logging.get_logger(__name__)
 
 def is_leaf_module(module):
     r"""Whether the module is a leaf module
     """
-    try:
-        return len([n for n,_ in module.named_children()]) == 0
-    except:
-        from IPython import embed
-        embed()
+    return len([n for n,_ in module.named_children()]) == 0
+
+        
 
 def non_module_param(module: nn.Module):
     module_names = [n for n, _ in module.named_modules()]
@@ -92,6 +93,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
     default_exclude_modules = ["lm_head"]
     config_class = BaseDeltaConfig
     default_unfrozen_modules = ["deltas"]
+    _need_pseudo_data = True
     def __init__(self,
                  backbone_model: nn.Module,
                  modified_modules: Optional[List[str]] = None,
@@ -99,6 +101,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
                  unfrozen_modules: Optional[List[str]] = None,
                  interactive_modify: Optional[Union[bool, int]] = False,
                  common_structure: Optional[bool] = False,
+                 framework_type: Optional[str]= "hf", # select from ["hf", "bmt"]
                  ):
         nn.Module.__init__(self)
         # register the backbone model after init using self.__dict__ method to avoid adding backbone_model
@@ -129,15 +132,16 @@ class DeltaBase(nn.Module, SaveLoadMixin):
                 self.exclude_modules = self.default_exclude_modules
             self.common_structure = common_structure
         if self.common_structure:
-            self.structure_mapping = CommonStructureMap.load(self.backbone_model)
+            self.structure_mapping = CommonStructureMap(self.backbone_model)
         else:
             self.structure_mapping = None
         if unfrozen_modules is None:
             self.unfrozen_modules = self.default_unfrozen_modules
         if self.common_structure and self.structure_mapping is None:
             raise RuntimeError("Using common structure but the structure mapping is None")
+        self.framework_type = framework_type
 
-    def forward(self, *args, **kwargs) -> "RuntimeError":
+    def forward(self, *args, **kwargs) -> RuntimeError:
         r"""
             .. warning::
 
@@ -197,15 +201,25 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         # create a new key list to avoid recursion.
         backbone_key_list = [key for key, _ in backbone.named_modules()]
         for key in backbone_key_list:
-            if self.find_key(key, modified_modules): #TODO may have bugs when commonstructure has a virtual node and it's refered
-                logger.debug("find key: {}".format(key))
+            if self.find_key(key, modified_modules):
                 self.update_module(backbone, key)
-        self._pseudo_data_to_instantiate(backbone)
+        if self._need_pseudo_data:
+            self._pseudo_data_to_instantiate(backbone)
+                    
         # mark the paratmers that are the delta parameters for easily displaying the delta_paramters.
         self.mark_as_delta()
         return backbone
 
-
+    def _pseudo_data_to_instantiate(self, backbone: Optional[nn.Module]=None):
+        if self.structure_mapping is None:
+            self._pseudo_data_to_instantiate_module(backbone)
+        else:
+            for key in self.structure_mapping.matched_pairs:
+                if key == "":
+                    submodule = backbone
+                else:
+                    _, _, submodule = self.find_module(backbone, key)
+                self._pseudo_data_to_instantiate_module(submodule)
 
     def mark_as_delta(self, module: nn.Module=None,):
         r"""[NODOC] Mark :obj:`module`'s all parameters as delta parameters by setting a ``_is_delta`` attribute to each of them.
@@ -277,21 +291,23 @@ class DeltaBase(nn.Module, SaveLoadMixin):
 
         if is_leaf_module(module):
             for n, p in module.named_parameters():
-                if self.find_key(".".join([prefix,n]), exclude):
+                next_prefix = n if prefix == "" else ".".join([prefix,n])
+                if self.find_key(next_prefix, exclude):
                     continue
                 if "deltas" not in exclude or (not (hasattr(p, "_is_delta") and getattr(p, "_is_delta"))):
                     p.requires_grad = False
             return
         else:
             for n, c in module.named_children():
-                if self.find_key(".".join([prefix,n]), exclude): # if found, untouch the parameters
+                next_prefix = n if prefix == "" else ".".join([prefix,n])
+                if self.find_key(next_prefix, exclude): # if found, untouch the parameters
                     continue
                 else: # firstly freeze the non module params, then go deeper.
                     params = non_module_param(module)
                     for n, p in params:
                         if "deltas" not in exclude or (not (hasattr(p, "_is_delta") and getattr(p, "_is_delta"))):
                             p.requires_grad = False
-                    self._freeze_module_recursive(c, exclude=exclude, prefix=".".join([prefix,n]) )
+                    self._freeze_module_recursive(c, exclude=exclude, prefix=next_prefix)
 
 
 
@@ -311,19 +327,24 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         for x in self.exclude_modules:
             if key.startswith(x): # start with the excluded key
                 return False
-        if self.common_structure:
-            key = self.structure_mapping.transform(key, strict=False)
+        virtual_key, in_virtual_order = None, None
+        if self.structure_mapping is not None:
+            key, virtual_key, in_virtual_order = self.structure_mapping.transform(key, strict=False)
+            # currently in_virtual_order not in use, it means that if the common structure designate adding adapter to FFN, it will be add to all submodule of FFN. 
         if not key:
             return False
-        try:
+        if virtual_key is None:
             return endswith_in(key, target_list)
-        except:
-            raise RuntimeError("find_key exception")
+        else:
+            return endswith_in(key, target_list) or endswith_in(virtual_key, target_list)
 
-    def _pseudo_data_to_instantiate(self, module: Optional[nn.Module]=None):
-        r"""Create a pseudo_data into the module to know the dimemsion of each tensor in the computation graph.
-        First try to use the dummy_inputs of the pretrained model. If the model has no dummy_inputs, will try to create
-        integer tensor as the pseudo_input,  if ``decoder_input_ids`` is in the model's forward function, additional create it.
+
+    def _pseudo_data_to_instantiate_module(self, module: Optional[nn.Module]=None):
+        r"""Some delta model requires a pseudo-data be passed through the model to understand the dimensionality of each tensor in the computation graph.
+
+        (1) The model in the Huggingface Transformers library usually has the so-called `dummy_inputs`. We will make use of it.
+        (2) If the model does not have `dummy_inputs`, we will try to create it and throw a warning.
+        (3) If we encounter an error in (2), we will suggest you to create it by passing the dummy_inputs variable.
 
         Args:
             module (:obj:`nn.Module`, *optional*, default to :obj:`None`): The backbone model.
@@ -332,17 +353,32 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         if module is None:
             module = self.backbone_model
         device = get_device(module)
+        _auto_dummy = False
         try:
             dummy_inputs = module.dummy_inputs
             dummy_inputs = move_dict_to_cuda(dummy_inputs, device)
-            module(**dummy_inputs)
         except AttributeError:
-            logger.warning("No dummy_inputs attributes, create a common input_ids for input.")
-            pseudo_input = torch.tensor([[0,0]]).to(device)
+            logger.warning(f"No `dummy_inputs` attribute in {module.__class__.__name__} , automatically create `dummy_inputs`. Very likely to encounter error. To set dummy_inputs for your model, please use: `setattr(backbone_model, 'dummy_inputs', some_dummy_inputs)` before initializing `{self.__class__.__name__}`")
+            _auto_dummy = True
+            pass
+        if _auto_dummy:
+            _most_simple_input = torch.tensor([[0,0]]).to(device)
             if "decoder_input_ids" in  signature(module.forward).args:
-                module(pseudo_input, decoder_input_ids = pseudo_input)
+                dummy_inputs = {"input_ids": _most_simple_input, "decoder_input_ids": _most_simple_input}
             else:
-                module(pseudo_input)
+                dummy_inputs = {"input_ids": _most_simple_input}
+
+        _auto_dummy_fail = False
+        try:
+            module(**dummy_inputs)
+        except:
+            _auto_dummy_fail = True
+        if _auto_dummy_fail:  
+            raise AttributeError(f"\n\tThe {self.__class__.__name__} requires a dummy_inputs to be passed through the model to understand the dimensionality of each tensor in the computation graph. \n\t The {module.__class__.__name__} Class has no dummy_inputs, and automatically created dummy_inputs failed.\n\t Refer to `https://opendelta.readthedocs.io/en/latest/notes/faq.html` for detail.")
+           
+
+
+
 
     def trainable_parameters_names(self, module: Optional[nn.Module]=None):
         r"""[NODOC] A small sugar function to return all the trainable parameter's name in the (by default, backbone) model.
@@ -498,7 +534,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         """
         raise NotImplementedError
 
-    def insert_sequential_module(self, module,  delta_module=None, delta_name='delta', strict=False, _delta_info=None):
+    def insert_module(self, module, method='sequential', delta_module=None, delta_name='delta', strict=False, _delta_info=None):
         r"""insert a module (previous not exists in the code base) before/after a module. Specifically, it modifies the forward
         function of the original module to  firstly pass the arguments into the new module's forward function and then pass
         it into the original ones. The new module can also be inserted after the original module with similar mechanism.
@@ -514,17 +550,6 @@ class DeltaBase(nn.Module, SaveLoadMixin):
                                     original delta is passed through ``_delta_info``.
 
         """
-        def _caller(_org_func, org_module, delta_name, *args, **kwargs):
-            args = args[1:] # the first argument here is ``self``
-            delta_module = getattr(org_module, delta_name)
-            if hasattr(delta_module, "pre_forward"):# is not None:
-                args, kwargs = delta_module.pre_forward(*args, **kwargs)
-            # from IPython import embed
-            # embed(header = "true")
-            ret = _org_func(*args, **kwargs)
-            if hasattr(delta_module, "post_forward"):# is not None:
-                ret = delta_module.post_forward(ret)
-            return ret
 
 
         if strict:
@@ -535,9 +560,9 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         if _delta_info is None:
             if delta_module is None:
                 raise RuntimeError("delta module can't be none to ensure successful replicate of the parent module.")
-
-            _delta_info = {"method": "insert_sequential",
-                        "delta_module": delta_module,
+        
+            _delta_info = {"method": method,
+                        "delta_module": delta_module, 
                         "delta_name": delta_name,
                         "delta_belong": self,
                         "state": "on"}
@@ -549,12 +574,36 @@ class DeltaBase(nn.Module, SaveLoadMixin):
 
         setattr(module, _delta_info['delta_name'], _delta_info["delta_module"])
 
-        new_forward = decorate(module.forward, _caller, extras=(module, _delta_info['delta_name']), kwsyntax=True) # decorator.decorate helps preserving the functions metadata (signature, etc.).
-        module.forward = new_forward.__get__(module, type(module))  # func.__get__(object, type(object)) register a function as an object's method
-        # for DataParallel's copy behavior. Experimental:
-        # may have bugs when module.forward is nestedly wrapped.
-        module._replicate_for_data_parallel = new_replicate_for_data_parallel.__get__(module, type(module))
 
+        if _delta_info["method"] in caller_map.keys():
+            caller = caller_map[_delta_info["method"]]
+            new_forward = decorate(module.forward, caller, extras=(module, _delta_info['delta_name']), kwsyntax=True) # decorator.decorate helps preserving the functions metadata (signature, etc.).
+            module.forward = new_forward.__get__(module, type(module))  # func.__get__(object, type(object)) register a function as an object's method
+            # for DataParallel's copy behavior. Experimental:
+            # may have bugs when module.forward is nestedly wrapped.
+            module._replicate_for_data_parallel = new_replicate_for_data_parallel.__get__(module, type(module)) 
+        else:
+            raise NotImplementedError(f"_delta_info['method']=='{_delta_info['method']}' is not supported")
+
+
+    def insert_sequential_module(self, module, delta_module=None, delta_name='delta', strict=False, _delta_info=None):
+        r"""insert a module (previous not exists in the code base) before/after a module. Specifically, it modifies the forward 
+        function of the original module to  firstly pass the arguments into the new module's forward function and then pass
+        it into the original ones. The new module can also be inserted after the original module with similar mechanism. 
+
+        When implementing the new module , researchers should be aware of the components of arguments of the original module's forward function.
+        
+        Args:
+            module: (:obj:`nn.Module`): The (sub)module to inserted a delta module.
+            delta_module: (:obj:`DeltaBase`): The delta module to be inserted.
+            name: (:obj:`str`, *optional*): The name of the delta in the backbone module.
+            strict: (:obj:`bool`, *optional*): Whether to prohibit modify a modified module.
+            _delta_info (:obj:`Dict`, *optional*): Used in attach(), reattach a delta module to backbone. The info of 
+                                    original delta is passed through ``_delta_info``.
+        
+        """
+        self.insert_module(module, "sequential", delta_module, delta_name, strict, _delta_info)
+                                             
 
     def insert_parallel_module(self, module, delta_module=None, delta_name='delta', strict=False, _delta_info=None):
         """insert a module (previous not exists in the code base) across a module. Specifically, it modifies the forward
@@ -573,41 +622,8 @@ class DeltaBase(nn.Module, SaveLoadMixin):
 
         """
 
-        def _caller(_org_func, org_module, delta_name, *args, **kwargs):
-            args = args[1:] # the first argument here is ``self``
-            delta_module = getattr(org_module, delta_name)
-            ret_1 = _org_func(*args, **kwargs)
-            ret_2 = delta_module.forward(*args, **kwargs)
-            return ret_1 + ret_2
-
-        if strict:
-            if hasattr(module.forward, "__wrapped__"):
-                raise RuntimeWarning("The forward function might have been wrapped by a decorator, is it intended?")
-
-        # record info for plug and unplug and nested wrap
-        if _delta_info is None:
-            if delta_module is None:
-                raise RuntimeError("delta module can't be none to ensure successful replicate of the parent module.")
-
-            _delta_info = {"method": "insert_parallel",
-                        "delta_module": delta_module,
-                        "delta_name": delta_name,
-                        "delta_belong": self,
-                        "state": "on"}
-            self._register_delta_infos(parent_module=module,
-                                    _delta_info = _delta_info)
-        else:
-            delta_module = _delta_info["delta_module"]
-            delta_name = _delta_info["delta_name"]
-
-        setattr(module, _delta_info['delta_name'], _delta_info["delta_module"])
-
-        new_forward = decorate(module.forward, _caller, extras=(module, _delta_info['delta_name']), kwsyntax=True) # decorator.decorate helps preserving the functions metadata (signature, etc.).
-        module.forward = new_forward.__get__(module, type(module))  # func.__get__(object, type(object)) register a function as an object's method
-        # for DataParallel's copy behavior. Experimental:
-        # may have bugs when module.forward is nestedly wrapped.
-        module._replicate_for_data_parallel = new_replicate_for_data_parallel.__get__(module, type(module))
-
+        self.insert_module(module, "parallel", delta_module, delta_name, strict, _delta_info)
+        
 
     def set_active_state_dict(self, module: nn.Module):
         r"""modify the state_dict function of the model (by default, the backbone model) to return only the tunable part.
@@ -623,8 +639,6 @@ class DeltaBase(nn.Module, SaveLoadMixin):
                     state_dict.pop(n)
             return state_dict
         includes = self.trainable_parameters_names(module) # use excludes will have trouble when the model have shared weights
-        # print(includes, "grad:",self.backbone_model.plm.lm_head.weight.requires_grad)
-        # exit()
         if hasattr(module.state_dict, "__wrapped__"):
             raise RuntimeWarning("The forward function might have been wrapped by a decorator, is it intended? Do you freeze the parameters twice?")
         module.state_dict = decorate(module.state_dict, _caller, extras=(includes,), kwsyntax=True) # decorator.decorate helps preserving the functions metadata (signature, etc.).
@@ -669,21 +683,46 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         if visualization:
             from opendelta import Visualization
             Visualization(module).structure_graph()
+
+        self.get_statistics(module)
         if trainable_ratio:
-            n_trainable = self.num_trainable_parameters(module)
-            n_total = self.num_total_parameters(module)
-            logger.info("Trainable Ratio: {:2f}%".format(n_trainable/n_total*100))
+            logger.info("Trainable Ratio: {:2f}%".format(self.stat['trainable_ratio']*100))
         if delta_ratio:
-            n_delta = self.num_delta_parameters(module)
-            n_total = self.num_total_parameters(module)
-            logger.info("Delta Parameter Ratio: {:2f}%".format(n_delta/n_total*100))
+            logger.info("Delta Parameter Ratio: {:2f}%".format(self.stat['delta_ratio']*100))
         if cuda_memory:
-            cudamem = 0
-            maxcudamem = 0
-            for device_id in range(torch.cuda.device_count()):
-                cudamem += torch.cuda.memory_allocated(f"cuda:{device_id}")/1024**3
-                maxcudamem += torch.cuda.max_memory_allocated(f"cuda:{device_id}")/1024**3
-            logger.info("Static Memory {:.2f} GB, Max Memory {:.2f} GB".format(cudamem, maxcudamem))
+            logger.info("Static Memory {:.2f} GB, Max Memory {:.2f} GB".format(self.stat['cudamem'], self.stat['maxcudamem']))
+
+
+    def get_statistics(self, module=None):
+        r"""Get the statistics of the parameters in the delta modules.
+
+        Args:
+            module (:obj:`nn.Module`, *optional*): The module to compute the statistics.
+
+        Returns:
+            :obj:`dict`: The statistics of the parameters in the delta modules.
+
+        """
+        if module is None:
+            module = self.backbone_model
+
+        self.stat = {}
+        n_trainable = self.num_trainable_parameters(module)
+        n_total = self.num_total_parameters(module)
+
+        self.stat['trainable_ratio'] = n_trainable/n_total
+
+        n_delta = self.num_delta_parameters(module)
+        n_total = self.num_total_parameters(module)
+        self.stat['delta_ratio'] = n_delta/n_total
+
+        cudamem = 0
+        maxcudamem = 0
+        for device_id in range(torch.cuda.device_count()):
+            cudamem += torch.cuda.memory_allocated(f"cuda:{device_id}")/1024**3
+            maxcudamem += torch.cuda.max_memory_allocated(f"cuda:{device_id}")/1024**3
+        self.stat['cudamem'] = cudamem
+        self.stat['maxcudamem'] = maxcudamem
 
 
 
@@ -767,13 +806,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
 
                     if _delta_info['method'] == "replace":
                         setattr(submodule, _delta_info["child_name"], _delta_info['org_module'])
-                    elif _delta_info['method'] == "insert_sequential":
-                        if hasattr(submodule.forward, "__wrapped__"):
-                            submodule.forward = submodule.forward.__wrapped__
-                            delattr(submodule, _delta_info["delta_name"])
-                        else:
-                            raise AttributeError("submodule {}'s forward has no attribute __wrapped__. It's not a wrapped function.".format(name))
-                    elif _delta_info['method'] == "insert_parallel":
+                    elif _delta_info['method'] in ["sequential", "before", "after", "parallel"]:
                         if hasattr(submodule.forward, "__wrapped__"):
                             submodule.forward = submodule.forward.__wrapped__
                             delattr(submodule, _delta_info["delta_name"])

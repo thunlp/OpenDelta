@@ -1,24 +1,59 @@
-# !!!!This example collection is still under develop, please wait for some time to use it.
+# Examples of using opendelta together with 🤗 transformers.
 
-## install the repo
+In this repo, we construct a very general pipeline to train and test a PLM using
+🤗 transformers.
+
+The pipeline was constructed together with [openpromptu](https://pypi.org/project/openpromptu/), which is a light and
+model-agnostic version of [openprompt](https://github.com/thunlp/OpenPrompt).
+
+## Pool of PLMs
+We are going to adapt most of the models in 🤗 transformers
+in the repos. The different pipeline, processing, or configurations are specified
+in `./backbones/`. You can add your own model in this file to support customized models.
+
+
+### A example script to run the repo in offline mode
 ```bash
-cd ../
-python setup_seq2seq.py develop
+conda activate [YOURENV]
+PATHBASE=[YOURPATH]
+
+JOBNAME="adapter_t5-base"
+DATASET="superglue-cb"
+
+cd $PATHBASE/OpenDelta/examples/examples_prompt/
+python configs/gen_t5.py --job $JOBNAME
+
+export TRANSFORMERS_OFFLINE=1
+export HF_DATASETS_OFFLINE=1
+python src/run.py configs/$JOBNAME/$DATASET.json \
+--model_name_or_path [YOURPATH_TO_T5_BASE] \
+--tokenizer_name [YOURPATH_TO_T5_BASE] \
+--datasets_saved_path [YOURPATH_TO_CB_DATASETS] \
+--finetuned_delta_path ${PATHBASE}/delta_checkpoints/ \
+--num_train_epochs 20 \
+--bottleneck_dim 24 \
+--delay_push True
 ```
-This will add `examples_seq2seq` to the environment path of the python lib.
 
-## Generating the json configuration file
+## A example of quick testing the repo.
 
-```shell
-python configs/gen_$BACKBONETYPE.py --job $YOURJOB
-#e.g. python configs/gen_beit.py --job lora_beit-base-patch16-224
-```
-The available job configuration (e.g., `--job lora_beit-base-patch16-224`) can be seen from the scripts. You can also
-create your only configuration.
+```bash
+conda activate [YOURENV]
+PATHBASE=[YOURPATH]
 
+JOBNAME="adapter_t5-base"
+DATASET="superglue-cb"
 
-## Run the code
+cd $PATHBASE/OpenDelta/examples/examples_prompt/
 
-```
-CUDA_VISIBLE_DEVICES=1 python src/run.py configs/lora_beit-base-patch16-224/beans.json
+export TRANSFORMERS_OFFLINE=1
+export HF_DATASETS_OFFLINE=1
+export DELTACENTER_OFFLINE=0
+python src/test.py configs/$JOBNAME/$DATASET.json \
+--model_name_or_path [YOURPATH_TO_T5_BASE] \
+--tokenizer_name [YOURPATH_TO_T5_BASE] \
+--datasets_saved_path [YOURPATH_TO_CB_DATASETS] \
+--finetuned_delta_path thunlp/t5-base_adapter_superglue-cb_20220701171436c80 \
+--delta_cache_dir "./delta_checkpoints/" \
+--force_download True
 ```

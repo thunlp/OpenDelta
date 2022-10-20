@@ -12,7 +12,7 @@ model = AutoModelForSequenceClassification.from_pretrained("facebook/bart-base")
 ## STEP 2: Add delta modules
 We provide two alternatives to add the delta modules.
 ### 2.1 Modification based on visualization
-Suppose we want to make the feedforward layer of each block as our [modification target module](target_module),
+Suppose we want to make the feedforward layer of each block as our [modification target module](targetmodules),
 We should first know what is the name of the feedforward layer in the BART model by visualization. <img src="../imgs/hint-icon-2.jpg" height="30px"> *For more about visualization, see [Visualization](visualization).*
 
 ```python
@@ -48,7 +48,7 @@ delta_model.log() # This will visualize the backbone after modification and othe
 ### 2.2 Use the default modification.
 We also provide the default modifications of each delta methods for some commonly used PTMs (e.g., BERT, RoBERTA, DistilBERT, T5, GPT2), so the users don't need to specify the submodules to modify.
 
-The default modifications is achieved by mapping a name of a submodule to it's name on a common transformer structure. <img src="../imgs/hint-icon-2.jpg" height="30px">  *For details about the common structure mapping, see [Common Structure Mapping](unifyname)*
+The default modifications is achieved by mapping a name of a submodule to it's name on a common transformer structure. <img src="../imgs/hint-icon-2.jpg" height="30px">  *For details about the common structure mapping, see [Common Structure Mapping](commonstructure)*
 
 
 

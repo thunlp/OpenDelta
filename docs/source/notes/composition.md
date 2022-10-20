@@ -1,10 +1,9 @@
-(composition)=
 # Composition of delta models
 
 With OpenDelta, you can perform compostion of different delta models.
 
 
-### Add different deltas to the backbone
+## Add different deltas to the backbone
 
 ```
 from transformers import AutoModelForSequenceClassification
@@ -18,14 +17,14 @@ delta_model.log()
 ```{figure} ../imgs/composition_of_delta.png
 ---
 width: 600px
-name: defaultmodification
+name: composition_of_delta
 ---
 ```
 ````
 
 
 
-### Even add multiple delta to the same layer
+## Even add multiple delta to the same layer
 
 ```
 from transformers import AutoModelForSequenceClassification
@@ -40,7 +39,7 @@ delta_model.log()
 ```{figure} ../imgs/multiple_to_one_layer.png
 ---
 width: 600px
-name: defaultmodification
+name: multiple_to_one_layer
 ---
 ```
 ````

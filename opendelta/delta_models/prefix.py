@@ -515,7 +515,8 @@ class PrefixModel(DeltaBase):
     """
     config_class = PrefixConfig
     delta_type = "prefix"
-    default_modified_modules = ['attn']
+    default_modified_modules = ['attn@']
+    _need_pseudo_data = True
     def __init__(self,
                  backbone_model: nn.Module,
                  prefix_token_num=6,
@@ -610,7 +611,7 @@ class PrefixModel(DeltaBase):
             module_device = get_device(module)
             prefixlayer = PrefixLayerBart(prefix_token_num=self.prefix_token_num, num_heads=module.num_heads ,device=module_device)
         else:
-            raise NotImplementedError(type(module))
+            raise NotImplementedError(f"We haven't implement Prefix Tuning Layer for {module.__class__.__name__}. Please refer to https://opendelta.readthedocs.io/en/latest/notes/faq.html for detail.")
         return prefixlayer, module
 
 

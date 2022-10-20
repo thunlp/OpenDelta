@@ -19,7 +19,7 @@ delta_model.log()
 ```{figure} ../imgs/plugunplug1.png
 ---
 width: 800px
-name: defaultmodification
+name: plugunplug1
 ---
 ```
 ````
@@ -33,7 +33,7 @@ delta_model.log()
 ```{figure} ../imgs/plugunplug2.png
 ---
 width: 800px
-name: defaultmodification
+name: plugunplug2
 ---
 ```
 ````
@@ -48,7 +48,7 @@ delta_model.log()
 ```{figure} ../imgs/plugunplug3.png
 ---
 width: 800px
-name: defaultmodification
+name: plugunplug3
 ---
 ```
 ````
@@ -67,7 +67,7 @@ delta_model2.log()
 ```{figure} ../imgs/plugunplug4.png
 ---
 width: 800px
-name: defaultmodification
+name: plugunplug4
 ---
 ```
 ````
@@ -81,7 +81,7 @@ delta_model.log()
 ```{figure} ../imgs/plugunplug5.png
 ---
 width: 800px
-name: defaultmodification
+name: plugunplug5
 ---
 ```
 ````
@@ -96,7 +96,7 @@ delta_model.log()
 ```{figure} ../imgs/plugunplug6.png
 ---
 width: 800px
-name: defaultmodification
+name: plugunplug6
 ---
 ```
 ````

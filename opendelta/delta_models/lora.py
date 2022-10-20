@@ -3,10 +3,10 @@ from typing import Optional, Union
 from opendelta.utils.signature import get_arg_names, get_arg_names_inside_func
 from opendelta.utils.name_based_addressing import *
 from opendelta.basemodel import DeltaBase
-from transformers.models.t5 import T5ForConditionalGeneration
 import torch.nn as nn
 from opendelta import BaseDeltaConfig
 import math
+from dataclasses import dataclass, field
 
 class LowRankLinear(nn.Module):
     #  ------------------------------------------------------------------------------------------
@@ -40,6 +40,11 @@ class LowRankLinear(nn.Module):
     def forward(self, x):
         return (self.lora_dropout(x) @ self.lora_A.T @ self.lora_B.T) * self.scaling
 
+@dataclass
+class LoraArguments:
+    r: int = 8
+    lora_alpha: int = 16
+    lora_dropout: float = 0.0
 
 class LoraConfig(BaseDeltaConfig):
     r"""
@@ -65,16 +70,17 @@ class LoraModel(DeltaBase):
     Thanks for their `loralib <https://github.com/microsoft/LoRA/tree/main/loralib>`_.
 
     .. note::
+
         In our implementation, we did not use loralib.linear to replace the linear layer of the backbone model.
         Instead, we insert a parallel module into the backbone.
-        In other words, we treat :math:`(W + A^TB) X` as :math:`WX+ A^TBX`, and insert the :math:`A^TBX` as a parallel insertion module.
-        If you want to use the original implementation, please refer to `lora_old.py`
+        In other words, we treat :math:`(W + A^TB) X` as :math:`WX+ A^TBX`, and insert the :math:`A^TBX` as a parallel insertion module. If you want to use the original implementation, please refer to `lora_old.py`
 
     class attributes:
-        - default_modified_modules = ['attn.q', 'attn.v'] According to the paper, they modify q and v matrix in the
-        attention layer. However, other linears can also be modified, and may lead to better performance.
+
+        - default_modified_modules = ['attn.q', 'attn.v'] According to the paper, they modify q and v matrix in the attention layer. However, other linears can also be modified, and may lead to better performance.
 
         .. note::
+        
             modified_modules should point to linear layer. We currently don't support broadcast to all linears in
             a module's child modules.
 
@@ -96,7 +102,8 @@ class LoraModel(DeltaBase):
 
     config_class = LoraConfig
     delta_type = "lora"
-    default_modified_modules = ['attn.q', 'attn.v']
+    default_modified_modules = ['attn@.q@', 'attn@.v@']
+    _need_pseudo_data = False
     def __init__(self,
                  backbone_model: nn.Module,
                  lora_r=8,

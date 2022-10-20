@@ -26,14 +26,13 @@ def preprocess_function(raw_example, **kwargs):
     example = InputExample(**raw_example)
 
 
-    try:
-        example = verbalizer.wrap_one_example(example)
-        example, other = template.wrap_one_example(example)
-        input_sentence = tokenizer_wrapper.merge_wrapped_example(example)
-        model_inputs = tokenizer(input_sentence, max_length=data_args.max_source_length,
-                            padding="max_length", truncation=True)
-    except:
-        from IPython import embed; embed(header="Therer")
+   
+    example = verbalizer.wrap_one_example(example)
+    example, other = template.wrap_one_example(example)
+    input_sentence = tokenizer_wrapper.merge_wrapped_example(example)
+    model_inputs = tokenizer(input_sentence, max_length=data_args.max_source_length,
+                        padding="max_length", truncation=True)
+
 
     with tokenizer.as_target_tokenizer():
         label = tokenizer(other['tgt_text']).input_ids
@@ -165,7 +164,7 @@ class Trainer(HfSeq2SeqTrainer):
         return (loss, generated_tokens, labels)
 
     def _compute_metrics(self, eval_preds):
-        from IPython import embed; embed(header="In compute metrics")
+        # from IPython import embed; embed(header="In compute metrics")
         preds, labels = eval_preds
         decoded_preds = self.tokenizer.batch_decode(preds, skip_special_tokens=True)
         decoded_labels = self.tokenizer.batch_decode(labels, skip_special_tokens=True)

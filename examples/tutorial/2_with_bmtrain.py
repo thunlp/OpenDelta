@@ -12,9 +12,9 @@ def manual_seed(seed):
 
 from model_center.model import Bert, BertConfig
 bmt.init_distributed()
-config = BertConfig.from_pretrained("/yinxr/zwl/.cache/model_center/bert-base-uncased")
+config = BertConfig.from_pretrained("bert-base-uncased")
 config.dropout_p = 0
-model = Bert.from_pretrained("/yinxr/zwl/.cache/model_center/bert-base-uncased", config)
+model = Bert.from_pretrained("bert-base-uncased", config)
 
 print("before modify")
 od.Visualization(model).structure_graph()
@@ -26,7 +26,7 @@ delta_model = LoraModel(backbone_model=model, modified_modules=['project_q', 'pr
 # delta_model = LowRankAdapterModel(backbone_model=model, modified_modules=['[r]layers\\.(\d)+\\.self_att', '[r]layers\\.(\d)+\\.ffn'])
 # delta_model = BitFitModel(backbone_model=model, modified_modules=['[r]layers\\.(\d)+\\.self_att', '[r]layers\\.(\d)+\\.ffn', '[r](.*)layernorm(.*)'])
 
-print(delta_model.delta_modules)
+# print(delta_model.delta_modules)
 
 print("after modify")
 delta_model.log()

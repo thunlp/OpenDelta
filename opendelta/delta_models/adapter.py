@@ -11,6 +11,8 @@ from opendelta import BaseDeltaConfig
 import opendelta.utils.logging as logging
 import numpy as np
 from opendelta import global_setting
+from dataclasses import dataclass, field
+
 logger = logging.get_logger(__name__)
 
 
@@ -20,10 +22,18 @@ class InterFaceMixin:
         self._reverse_axis_order = np.argsort(self._axis_order).tolist()
 
     def _transpose(self, tensor):
-        return tensor.permute(*self._axis_order)
+        if tensor.dim() == 3:
+            return tensor.permute(*self._axis_order)
+        else:
+            return tensor
+
+
 
     def _reverse_transpose(self, tensor):
-        return tensor.permute(*self._reverse_axis_order).contiguous()
+        if tensor.dim() == 3:
+            return tensor.permute(*self._reverse_axis_order).contiguous()
+        else:
+            return tensor
 
     def _convert_data_type(self, tensor):
         self._data_type_record = tensor.dtype
@@ -32,6 +42,8 @@ class InterFaceMixin:
 
     def _reverse_data_type(self, tensor):
         return tensor.to(self._data_type_record).to(self._device_record)
+
+
 
 
 
@@ -144,7 +156,6 @@ class AdapterConfig(BaseDeltaConfig):
         self,
         bottleneck_dim: Optional[int]=24,
         non_linearity: Optional[str]='gelu_new',
-        sequential: Optional[str] = True,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -175,27 +186,21 @@ class AdapterModel(DeltaBase):
         backbone_model (:obj:`transformers.PretrainedModels`): The backbone model to be modified.
         bottleneck_dim (:obj:`int`): The dimension of the adapter's bottleneck.
         non_linearity (:obj:`str`): The non linearity of the adapter.
-        sequential (:obj:`str`): Whether insert the adapter in a sequential manner, as opposed to a parallel manner.
-                        See `Towards a Unified View of Parameter-Efficient Transfer Learning <https://arxiv.org/abs/2110.04366>`_
-                        for detail.
-        modified_modules (:obj:`List[str]`): For prefix tuning, the it must refer to an attention layer (Currently, only
-                        the implemented ones)
-        unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen
-                         together with the prefix parameters.
-        common_structure (:obj:`bool`): whether using name-based addressing with a common structure mapping.
+        modified_modules (:obj:`List[str]`): modules to add adapter after them.
+        unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen together with the adapter parameters.
+        common_structure (:obj:`bool`): whether using name-based addressing witha common structure mapping.
 
     """
     config_class = AdapterConfig
     delta_type = "adapter"
-    default_modified_modules = ["attn", "ff"]
+    default_modified_modules = ["attn@.proj@", "ff@.w2@"]
+    _need_pseudo_data = True
     def __init__(self,
                  backbone_model: nn.Module,
                  bottleneck_dim: Optional[int]=24,
                  non_linearity: Optional[str]='gelu_new',
-                 sequential: Optional[str] = True,
-                 modified_modules: Optional[List[str]] = None,
-                 exclude_modules: Optional[List[str]] = None,
-                 unfrozen_modules: Optional[List[str]] = None,
+                 modified_modules: Optional[bool] = None,
+                 unfrozen_modules: Optional[bool] = None,
                  common_structure: Optional[bool] = None,
                  interactive_modify: Optional[Union[bool, int]] = False,
                  ):
@@ -217,19 +222,8 @@ class AdapterModel(DeltaBase):
         self.add_all_delta_to_backbone(self.backbone_model,
                                    self.modified_modules,
                                    )
-
-
-    def add_all_delta_to_backbone(self,
-                 module: nn.Module,
-                 modified_modules: List[str],
-                ) -> nn.Module:
-        for key, _ in module.named_modules():
-            if self.find_key(key, modified_modules):
-                self.update_module(module, key)
-        self._pseudo_data_to_instantiate(module)
-        self.mark_as_delta()
-        return module
-
+  
+    
     def update_module(self, module: nn.Module, key: str):
         _, _, ref = self.find_module(module, key)
         adapterlayer = self.new_module_like(ref)

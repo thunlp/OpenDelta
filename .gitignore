@@ -35,4 +35,27 @@ log.txt
 **/examples/examples_bmtrain/BMPretrain
 **/examples/examples_bmtrain/BigModels/BigModels/results
 **/Delta_Memory/
+**/output/
+**/thunlp/
+**/saved_ckpts/
+
+
+DeltaCenter-Python-Client/
+backbone_structure
+delta_checkpoints
+gitop.sh
+load_dataset_and_model.ipynb
+load_model.py
+scripts
+t.py
+t.sh
+!examples/examples_prompt/configs/*/*.json
+!examples/examples_prompt/configs/**
+**/delta_checkpoints/
+**/outputs/
+
+
+**/unittest/**
+!unittest/**.py
+!unittest/**.sh
 

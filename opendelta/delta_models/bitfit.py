@@ -75,6 +75,16 @@ class BiasLayer(nn.Module):
             raise TypeError
         return output
 
+framework_map = {}
+framework_map['hf'] = {
+    "linear": nn.Linear,
+    "layer_norm": nn.LayerNorm,
+}
+
+framework_map['bmt'] = {
+    "linear": model_center.layer.Linear,
+    "layer_norm", model_center.layer.LayerNorm,
+}
 
 
 class BitFitModel(DeltaBase):
@@ -113,7 +123,8 @@ class BitFitModel(DeltaBase):
 
     config_class = BitFitConfig
     delta_type = "bitfit"
-    default_modified_modules = ["attn", "ff", "layer_norm","lm_head.proj"] # modify all the bias parameter in attention and feed-forward layer.
+    default_modified_modules = ["attn@", "ff@", "layer_norm@","lm_head@.proj@"] # modify all the bias parameter in attention and feed-forward layer.
+    _need_pseudo_data = False
     def __init__(self,
                  backbone_model: nn.Module,
                  modified_modules: Optional[List[str]] = None,
@@ -121,6 +132,7 @@ class BitFitModel(DeltaBase):
                  unfrozen_modules: Optional[List[str]] = None,
                  common_structure: Optional[bool] = None,
                  interactive_modify: Optional[Union[bool, int]] = False,
+                 framework_type: Optional[str] = "hf",
                  ):
         DeltaBase.__init__(self,
                            backbone_model,
@@ -129,6 +141,7 @@ class BitFitModel(DeltaBase):
                            unfrozen_modules=unfrozen_modules,
                            common_structure=common_structure,
                            interactive_modify=interactive_modify,
+                           framework_type=framework_type,
                            )
         arg_names = get_arg_names_inside_func(self.__init__)
         for arg_name in arg_names:
@@ -139,8 +152,7 @@ class BitFitModel(DeltaBase):
         self.delta_modules = nn.ModuleList()
 
         self.add_all_delta_to_backbone(self.backbone_model,
-                                       self.modified_modules,
-                                   )
+                                       self.modified_modules)
 
 
     def update_module(self, module: nn.Module, key: str):
@@ -153,38 +165,58 @@ class BitFitModel(DeltaBase):
                       ):
         if is_leaf_module(module):
             # if it is a leaf module, add bias to it regardless of its type.
-            if self.check_linear(module):
-                self.add_bias_to_linear(module)
+            # if self.check_linear(module):
+            #     self.add_bias_to_linear(module)
+            if self.check_linear(module) or self.check_layernorm(module, nn.LayerNorm):
+                self.add_bias_to_modules_have_bias_or_known_type(module)
             else:
                 # for example, layer_norms, lm_heads.
                 self.add_bias_to_others(module)
         else:
-            # for the non-leaf modules, by default it will add bias only to the linear submodules.
             for n, c in module.named_modules():
-                if self.check_linear(c):
-                    self.add_bias_to_linear(c)
-                else:
-                    pass
+                self.add_bias_to_modules_have_bias_or_known_type(c)
+    #             if self.check_linear(c):
+    #                 self.add_bias_to_linear(c)
+    #             else:
+    #                 pass
 
-    def add_bias_to_linear(self, c):
-        if c.bias is None:
-            bias = nn.Parameter(torch.empty(c.out_features), requires_grad=True)
-            self._reset_bias_parameters(c)
-            try:
-                import bmtrain as bmt
-                bias = bmt.BMTrainModelWrapper(bias)
-            except:
-                pass
-            c.register_parameter('bias', bias)
-            self.delta_params.append(bias)
-        else:
+    # def add_bias_to_linear(self, c):
+    #     if c.bias is None:
+    #         bias = nn.Parameter(torch.empty(c.out_features), requires_grad=True)
+    #         self._reset_bias_parameters(c)
+    #         try:
+    #             import bmtrain as bmt
+    #             bias = bmt.BMTrainModelWrapper(bias)
+    #         except:
+    #             pass
+    #         c.register_parameter('bias', bias)
+    #         self.delta_params.append(bias)
+    #     else:
+    #             self.add_bias_to_modules_have_bias_or_known_type(c)
+
+    def add_bias_to_modules_have_bias_or_known_type(self, c):
+        '''If it has bias, unfreeze it. 
+        If it doesn't have bias: if it is Linear of LN, add to it, else pass.
+        '''
+        if 'bias' in [n for n,p in c.named_parameters()]:
             c.bias.requires_grad = True
             self.delta_params.append(c.bias)
+        else:
+            if self.check_linear(c) or isinstance(c): # todo: bmt layerNorm
+                bias = nn.Parameter(torch.empty(c.out_features), requires_grad=True)
+                
+                self._reset_bias_parameters(c) #?
+                try:
+                    import bmtrain as bmt
+                    bias = bmt.BMTrainModelWrapper(bias)
+                except:
+                    pass
+                c.register_parameter('bias', bias)
+                self.delta_params.append(bias)
 
-    def add_bias_to_others(self, c):
+    def add_bias_to_others(self, c): # todo: bmtrain?
         new_bias = BiasLayer(dtype=get_dtype(c), device=get_device(c))
-        self.insert_sequential_module(c, delta_module=new_bias, delta_name="bitfit") # name shouldn't be `bias` here, since
-                                        # the name `bias` is reserved for some module such as  roberta's LayerNorm.
+        self.insert_sequential_module(c, delta_module=new_bias, delta_name="bitfit") # name shouldn't be `bias` here, since the name `bias` is reserved for some module such as roberta's LayerNorm.
         self.delta_modules.append(new_bias)
 
     def check_linear(self, m):
@@ -194,6 +226,18 @@ class BitFitModel(DeltaBase):
             try:
                 from model_center.layer import Linear
                 if isinstance(m, Linear):
+                    return True
+            except:
+                pass
+        return False
+    
+    def check_layernorm(self, m):
+        if isinstance(m, nn.LayerNorm):
+            return True
+        else:
+            try:
+                from model_center.layer import LayerNorm
+                if isinstance(m, LayerNorm):
                     return True
             except:
                 pass
