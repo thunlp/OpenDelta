@@ -59,3 +59,6 @@ t.sh
 !unittest/**.py
 !unittest/**.sh
 
+dist/
+dist/*
+
