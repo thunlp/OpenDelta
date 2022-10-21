@@ -1,4 +1,4 @@
-# Adapted from Tevatron (https://github.com/texttron/tevatron)
+
 
 from argparse import ArgumentParser
 import logging
