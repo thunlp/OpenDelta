@@ -1,6 +1,14 @@
 
 (acceleration)=
 # OpenDelta+
-<img src="../imgs/todo-icon.jpeg" height="30px"> We are working on testing and improving the functionality with work with other acceleration packages for model training and inference. For example, [deepspeed](https://github.com/microsoft/DeepSpeed), [BMInf](https://github.com/OpenBMB/BMInf).
 
-Feel free to contact us via email (shengdinghu@gmail.com) if you have any suggestion.
+## BMTrain
+
+- [BMTrain](https://github.com/OpenBMB/BMTrain) is an efficient large model training toolkit that can be used to train large models with tens of billions of parameters. It can train models in a distributed manner while keeping the code as simple as stand-alone training.
+- [ModelCenter](https://github.com/OpenBMB/ModelCenter) implements pre-trained language models (PLMs) based on the backend OpenBMB/BMTrain. ModelCenter supports Efficient, Low-Resource, Extendable model usage and distributed training.
+
+Now we have the LoraModel, AdapterModel, CompacterModel, ParallelAdapterModel, LowRankAdapterModel fully supported the distributed training with BMTrain and ModelCenter. Please try is out in 
+
+
+## Huggingface Accelerate
+<img src="../imgs/todo-icon.jpeg" height="30px"> 

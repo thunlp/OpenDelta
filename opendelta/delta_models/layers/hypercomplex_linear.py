@@ -84,7 +84,8 @@ class PHMLinear(torch.nn.Module):
                  factorized_phm_rule=False,
                  phm_rank = 1,
                  phm_init_range=0.0001,
-                 kronecker_prod=False) -> None:
+                 kronecker_prod=False,
+                 dtype=torch.float) -> None:
         super(PHMLinear, self).__init__()
         assert w_init in ["phm", "glorot-normal", "glorot-uniform", "normal"]
         assert c_init in ["normal", "uniform"]
@@ -104,12 +105,12 @@ class PHMLinear(torch.nn.Module):
         self.factorized_phm_rule = factorized_phm_rule 
         if not self.shared_phm_rule:
             if self.factorized_phm_rule:
-                self.phm_rule_left = nn.Parameter(torch.FloatTensor(phm_dim, phm_dim, 1),
+                self.phm_rule_left = nn.Parameter(torch.empty((phm_dim, phm_dim, 1), dtype=dtype),
                        requires_grad=learn_phm)
-                self.phm_rule_right = nn.Parameter(torch.FloatTensor(phm_dim, 1, phm_dim),
+                self.phm_rule_right = nn.Parameter(torch.empty((phm_dim, 1, phm_dim), dtype=dtype),
                        requires_grad=learn_phm)
             else:
-                self.phm_rule = nn.Parameter(torch.FloatTensor(phm_dim, phm_dim, phm_dim), 
+                self.phm_rule = nn.Parameter(torch.empty((phm_dim, phm_dim, phm_dim), dtype=dtype), 
                        requires_grad=learn_phm)
         self.bias_flag = bias
         self.w_init = w_init
@@ -118,15 +119,15 @@ class PHMLinear(torch.nn.Module):
         self.factorized_phm = factorized_phm
         if not self.shared_W_phm:
             if self.factorized_phm:
-                self.W_left = nn.Parameter(torch.Tensor(size=(phm_dim, self._in_feats_per_axis, self.phm_rank)),
+                self.W_left = nn.Parameter(torch.empty((phm_dim, self._in_feats_per_axis, self.phm_rank), dtype=dtype),
                               requires_grad=True)
-                self.W_right = nn.Parameter(torch.Tensor(size=(phm_dim, self.phm_rank, self._out_feats_per_axis)),
+                self.W_right = nn.Parameter(torch.empty((phm_dim, self.phm_rank, self._out_feats_per_axis), dtype=dtype),
                               requires_grad=True)
             else:
-                self.W = nn.Parameter(torch.Tensor(size=(phm_dim, self._in_feats_per_axis, self._out_feats_per_axis)),
+                self.W = nn.Parameter(torch.empty((phm_dim, self._in_feats_per_axis, self._out_feats_per_axis), dtype=dtype),
                               requires_grad=True)
         if self.bias_flag:
-            self.b = nn.Parameter(torch.Tensor(out_features))
+            self.b = nn.Parameter(torch.empty(out_features, dtype=dtype), requires_grad=True)
         else:
             self.register_parameter("b", None)
         self.reset_parameters()

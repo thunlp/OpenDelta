@@ -36,6 +36,7 @@ class HyperComplexAdapterLayer(nn.Module):
                  device=None,
                  use_bias_up_sampler=True,
                  use_bias_down_sampler=True,
+                 backend = 'hf',
                  ):
         super().__init__()
         self.reduction_factor = reduction_factor
@@ -55,14 +56,17 @@ class HyperComplexAdapterLayer(nn.Module):
         self.use_bias_up_sampler=use_bias_up_sampler
         self.use_bias_down_sampler=use_bias_down_sampler
         self.device = device
+        self.backend = backend
 
         self.instantiated = False
 
 
-    def instantiate(self, hidden_dim):
-        self.down_sample_size = hidden_dim // self.reduction_factor
+    def instantiate(self, hiddens):
+        self.hidden_dim = hiddens.shape[-1]
+        self.hidden_dtype = hiddens.dtype
+        self.down_sample_size = self.hidden_dim // self.reduction_factor
         self.activation = Activations(self.non_linearity.lower()).to(self.device)
-        self.down_sampler = PHMLinear(in_features=hidden_dim,
+        self.down_sampler = PHMLinear(in_features=self.hidden_dim,
                                       out_features=self.down_sample_size,
                                       bias=self.use_bias_down_sampler,
                                       c_init=self.phm_c_init,
@@ -76,9 +80,10 @@ class HyperComplexAdapterLayer(nn.Module):
                                       factorized_phm_rule=self.factorized_phm_rule,
                                       phm_rank=self.phm_rank,
                                       phm_init_range=self.phm_init_range,
-                                      kronecker_prod=self.kronecker_prod).to(self.device)
+                                      kronecker_prod=self.kronecker_prod,
+                                      dtype = self.hidden_dtype).to(self.device)
         self.up_sampler = PHMLinear(in_features=self.down_sample_size,
-                                    out_features=hidden_dim,
+                                    out_features=self.hidden_dim,
                                     bias=self.use_bias_up_sampler,
                                     c_init=self.phm_c_init,
                                     phm_dim=self.hypercomplex_division,
@@ -91,15 +96,14 @@ class HyperComplexAdapterLayer(nn.Module):
                                     factorized_phm_rule=self.factorized_phm_rule,
                                     phm_rank=self.phm_rank,
                                     phm_init_range=self.phm_init_range,
-                                    kronecker_prod=self.kronecker_prod).to(self.device)
+                                    kronecker_prod=self.kronecker_prod,
+                                    dtype = self.hidden_dtype).to(self.device)
         self.instantiated = True
-        try:
+        if self.backend == "bmt":
             import bmtrain as bmt
             self.activation = bmt.BMTrainModelWrapper(self.activation)
             self.down_sampler = bmt.BMTrainModelWrapper(self.down_sampler)
             self.up_sampler = bmt.BMTrainModelWrapper(self.up_sampler)
-        except:
-            pass
 
 
     def post_forward(self, output):
@@ -116,9 +120,7 @@ class HyperComplexAdapterLayer(nn.Module):
             raise TypeError
 
         if not self.instantiated:
-            self.hidden_dim = hiddens.shape[-1]
-            logger.debug(f"Got hidden dim hidden_dim {self.hidden_dim}")
-            self.instantiate(hidden_dim=self.hidden_dim)
+            self.instantiate(hiddens=hiddens)
 
 
         z = self.down_sampler(hiddens)
@@ -193,6 +195,7 @@ class CompacterModel(DeltaBase):
         unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen
                          together with the prefix parameters.
         common_structure (:obj:`bool`, *optional*, default to :obj:`None`): whether using name-based addressing with a common structure mapping.
+        backend (:obj:`str`): choose the backend of plm, 'hf' for huggingface transformers,'bmt' for bmtrain
         reduction_factor (:obj:`int`, *optional*, default to ``16``): bottleneck_dim = hidden_dim//reduction_factor
         non_linearity (:obj:`str`, *optional*, default to ``"gelu_new"``): The non linearity activation used in between the down
                         projecter and the up projecter.
@@ -218,6 +221,7 @@ class CompacterModel(DeltaBase):
     config_class = CompacterConfig
     delta_type = "compacter"
     default_modified_modules = ["attn@.proj@", "ff@.w2@"]
+    _supported_backends = ['hf', 'bmt']
     _need_pseudo_data = True
     def __init__(self,
                  backbone_model,
@@ -226,6 +230,7 @@ class CompacterModel(DeltaBase):
                  unfrozen_modules: Optional[List[str]] = None,
                  common_structure: Optional[bool] = None,
                  interactive_modify: Optional[Union[bool, int]] = False,
+                 backend: Optional[str] = 'hf',
                  reduction_factor=16,
                  non_linearity="gelu_new",
                  phm_c_init="normal",
@@ -288,22 +293,6 @@ class CompacterModel(DeltaBase):
 
     def new_module_like(self, module):
         module_device = get_device(module)
-        adapterlayer = HyperComplexAdapterLayer(reduction_factor=self.reduction_factor,
-                                                non_linearity=self.non_linearity,
-                                                phm_c_init=self.phm_c_init,
-                                                hypercomplex_division=self.hypercomplex_division,
-                                                learn_phm=self.learn_phm,
-                                                hypercomplex_nonlinearity=self.hypercomplex_nonlinearity,
-                                                shared_phm_rule=self.shared_phm_rule,
-                                                factorized_phm=self.factorized_phm,
-                                                shared_W_phm=self.shared_W_phm,
-                                                factorized_phm_rule=self.factorized_phm_rule,
-                                                phm_rank=self.phm_rank,
-                                                phm_init_range=self.phm_init_range,
-                                                kronecker_prod=self.kronecker_prod,
-                                                use_bias_up_sampler=self.use_bias_up_sampler,
-                                                use_bias_down_sampler=self.use_bias_down_sampler,
-                                                device=module_device
-                                                )
+        adapterlayer = HyperComplexAdapterLayer(reduction_factor=self.reduction_factor, non_linearity=self.non_linearity, phm_c_init=self.phm_c_init, hypercomplex_division=self.hypercomplex_division, learn_phm=self.learn_phm, hypercomplex_nonlinearity=self.hypercomplex_nonlinearity, shared_phm_rule=self.shared_phm_rule, factorized_phm=self.factorized_phm, shared_W_phm=self.shared_W_phm, factorized_phm_rule=self.factorized_phm_rule, phm_rank=self.phm_rank, phm_init_range=self.phm_init_range, kronecker_prod=self.kronecker_prod, use_bias_up_sampler=self.use_bias_up_sampler, use_bias_down_sampler=self.use_bias_down_sampler, device=module_device, backend=self.backend)
         self.delta_modules.append(adapterlayer)
         return adapterlayer

@@ -31,8 +31,8 @@ copyright = '{}, {}, Licenced under the Apache License, Version 2.0'.format(date
 
 
 # The full version, including alpha/beta/rc tags
-release = '0.3.1'
-version = "0.3.1"
+release = '0.3.2'
+version = "0.3.2"
 
 html_theme = 'sphinx_rtd_theme'
 html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]

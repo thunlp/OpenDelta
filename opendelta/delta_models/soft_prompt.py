@@ -161,6 +161,7 @@ class SoftPromptModel(DeltaBase):
     config_class = SoftPromptConfig
     delta_type = "soft_prompt"
     default_modified_modules = ["root"]  # not used
+    _supported_backends = ['hf'] #'bmt']
     _need_pseudo_data = False
     def __init__(self,
                  backbone_model: nn.Module,

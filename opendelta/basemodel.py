@@ -5,6 +5,7 @@ from multiprocessing.sharedctypes import Value
 import os
 from turtle import back
 from opendelta.delta_configs import BaseDeltaConfig
+from opendelta.utils.inspect import inspect_module_statistics
 from opendelta.utils.model_md5 import gen_model_hash
 from opendelta.utils.signature import get_arg_names, signature
 from typing import Optional, Union
@@ -27,6 +28,7 @@ from opendelta.utils.cuda import move_dict_to_cuda
 import sys
 
 from opendelta.utils.data_parallel import caller_map
+from opendelta.utils.backend import BackendMapping
 logger = logging.get_logger(__name__)
 
 def is_leaf_module(module):
@@ -94,6 +96,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
     config_class = BaseDeltaConfig
     default_unfrozen_modules = ["deltas"]
     _need_pseudo_data = True
+    _supported_backends = ['hf']
     def __init__(self,
                  backbone_model: nn.Module,
                  modified_modules: Optional[List[str]] = None,
@@ -101,7 +104,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
                  unfrozen_modules: Optional[List[str]] = None,
                  interactive_modify: Optional[Union[bool, int]] = False,
                  common_structure: Optional[bool] = False,
-                 framework_type: Optional[str]= "hf", # select from ["hf", "bmt"]
+                 backend: Optional[str]= "hf", # select from ["hf", "bmt"]
                  ):
         nn.Module.__init__(self)
         # register the backbone model after init using self.__dict__ method to avoid adding backbone_model
@@ -139,7 +142,10 @@ class DeltaBase(nn.Module, SaveLoadMixin):
             self.unfrozen_modules = self.default_unfrozen_modules
         if self.common_structure and self.structure_mapping is None:
             raise RuntimeError("Using common structure but the structure mapping is None")
-        self.framework_type = framework_type
+        if backend not in self._supported_backends:
+            raise RuntimeError("Currently, backend `{}` is not supported for `{}`".format(backend, self.__class__.__name__))
+        self.backend = backend
+        self.backend_mapping = BackendMapping(backend)
 
     def forward(self, *args, **kwargs) -> RuntimeError:
         r"""
@@ -371,10 +377,11 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         _auto_dummy_fail = False
         try:
             module(**dummy_inputs)
-        except:
+        except Exception as e:
             _auto_dummy_fail = True
-        if _auto_dummy_fail:  
-            raise AttributeError(f"\n\tThe {self.__class__.__name__} requires a dummy_inputs to be passed through the model to understand the dimensionality of each tensor in the computation graph. \n\t The {module.__class__.__name__} Class has no dummy_inputs, and automatically created dummy_inputs failed.\n\t Refer to `https://opendelta.readthedocs.io/en/latest/notes/faq.html` for detail.")
+        
+            if _auto_dummy_fail and _auto_dummy:  
+                raise AttributeError(f"str({e})\n\tThe {self.__class__.__name__} requires a dummy_inputs to be passed through the model to understand the dimensionality of each tensor in the computation graph. \n\t The {module.__class__.__name__} Class has no dummy_inputs, and automatically created dummy_inputs failed.\n\t Refer to `https://opendelta.readthedocs.io/en/latest/notes/faq.html` for detail.")
            
 
 
@@ -684,65 +691,16 @@ class DeltaBase(nn.Module, SaveLoadMixin):
             from opendelta import Visualization
             Visualization(module).structure_graph()
 
-        self.get_statistics(module)
+        self.stat = inspect_module_statistics(module, verbose=False)
         if trainable_ratio:
-            logger.info("Trainable Ratio: {:2f}%".format(self.stat['trainable_ratio']*100))
+            logger.info("Trainable Ratio: {}/{}={:.6f}%".format(self.stat['trainable_parameters'], self.stat['total_parameters'], self.stat['trainable_ratio']*100))
         if delta_ratio:
-            logger.info("Delta Parameter Ratio: {:2f}%".format(self.stat['delta_ratio']*100))
+            logger.info("Delta Parameter Ratio: {}/{}={:.6f}%".format(self.stat['delta_parameters'], self.stat['total_parameters'],self.stat['delta_ratio']*100))
         if cuda_memory:
             logger.info("Static Memory {:.2f} GB, Max Memory {:.2f} GB".format(self.stat['cudamem'], self.stat['maxcudamem']))
 
 
-    def get_statistics(self, module=None):
-        r"""Get the statistics of the parameters in the delta modules.
 
-        Args:
-            module (:obj:`nn.Module`, *optional*): The module to compute the statistics.
-
-        Returns:
-            :obj:`dict`: The statistics of the parameters in the delta modules.
-
-        """
-        if module is None:
-            module = self.backbone_model
-
-        self.stat = {}
-        n_trainable = self.num_trainable_parameters(module)
-        n_total = self.num_total_parameters(module)
-
-        self.stat['trainable_ratio'] = n_trainable/n_total
-
-        n_delta = self.num_delta_parameters(module)
-        n_total = self.num_total_parameters(module)
-        self.stat['delta_ratio'] = n_delta/n_total
-
-        cudamem = 0
-        maxcudamem = 0
-        for device_id in range(torch.cuda.device_count()):
-            cudamem += torch.cuda.memory_allocated(f"cuda:{device_id}")/1024**3
-            maxcudamem += torch.cuda.max_memory_allocated(f"cuda:{device_id}")/1024**3
-        self.stat['cudamem'] = cudamem
-        self.stat['maxcudamem'] = maxcudamem
-
-
-
-    def num_delta_parameters(self, module: Optional[nn.Module]=None):
-        r"""[NODOC] A small sugar function to get the number of trainable parameter in the backbone model. Often used to
-        compute the trainable rate.
-
-        Args:
-            module (:obj:`nn.Module`): of which module we want to know the number of trainable paramemters.
-
-        Returns:
-            :obj:`List[nn.Parameter]`
-        """
-        if module is None:
-            module = self.backbone_model
-        pnum_tot = 0
-        for param in module.parameters():
-            if hasattr(param, "_is_delta"):
-                pnum_tot += param.numel()
-        return pnum_tot
 
     # Two functions for plug and remove the delta model.
     def attach(self, module: Optional[nn.Module]=None, reset_state_dict=True):

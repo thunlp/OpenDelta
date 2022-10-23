@@ -6,17 +6,17 @@ from opendelta.delta_models.layers.init import glorot_uniform, glorot_normal
 
 class LowRankLinear(torch.nn.Module):
     def __init__(self, input_dim: int, output_dim: int, rank: int = 1,
-        bias: bool = True, w_init: str = "glorot-uniform"):
+        bias: bool = True, w_init: str = "glorot-uniform", dtype=torch.float):
         super(LowRankLinear, self).__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim 
         self.rank = rank
         self.bias = bias
         self.w_init = w_init
-        self.W_left = nn.Parameter(torch.Tensor(size=(input_dim, rank)), requires_grad=True)
-        self.W_right = nn.Parameter(torch.Tensor(size=(rank, output_dim)), requires_grad=True)
+        self.W_left = nn.Parameter(torch.empty((input_dim, rank), dtype=dtype),requires_grad=True)
+        self.W_right = nn.Parameter(torch.empty((rank, output_dim), dtype=dtype), requires_grad=True)
         if bias:
-            self.b = nn.Parameter(torch.Tensor(output_dim))
+            self.b = nn.Parameter(torch.empty(output_dim, dtype=dtype))
         self.reset_parameters()
     
     def reset_parameters(self):

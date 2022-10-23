@@ -67,6 +67,16 @@ delta2.detach()
 # say we add lora to the last four layer of the decoder of t5, with lora rank=5
 delta_config3 = AutoDeltaConfig.from_dict({"delta_type":"lora", "modified_modules":["[r]decoder.*((20)|(21)|(22)|(23)).*DenseReluDense\.wi"], "lora_r":5})
 delta3 = AutoDeltaModel.from_config(delta_config3, backbone_model=wrapped_model)
+delta3.freeze_module()
 delta3.log()
+
+
+# add optimizer as normal
+from transformers import AdamW
+optimizer = AdamW(wrapped_model.parameters(), lr=3e-3)
+
+# inspect_optimizer
+from opendelta.utils.inspect import inspect_optimizer_statistics
+inspect_optimizer_statistics(optimizer)
 
 
