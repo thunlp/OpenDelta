@@ -54,11 +54,18 @@ t.sh
 **/delta_checkpoints/
 **/outputs/
 
+dist/
+dist/*
 
 **/unittest/**
 !unittest/**.py
 !unittest/**.sh
+!unittest/**.md
 
-dist/
-dist/*
+**/tutorial/**
+!tutorial/**.py
+!tutorial/**.sh
+!tutorial/**.md
+
+
 

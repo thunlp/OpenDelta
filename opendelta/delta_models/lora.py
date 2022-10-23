@@ -97,12 +97,14 @@ class LoraModel(DeltaBase):
         unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen
                          together with the prefix parameters.
         common_structure (:obj:`bool`): whether using name-based addressing with a common structure mapping.
+        backend (:obj:`str`): choose the backend of plm, 'hf' for huggingface transformers,'bmt' for bmtrain
 
     """
 
     config_class = LoraConfig
     delta_type = "lora"
     default_modified_modules = ['attn@.q@', 'attn@.v@']
+    _supported_backends = ['hf', 'bmt']
     _need_pseudo_data = False
     def __init__(self,
                  backbone_model: nn.Module,
@@ -114,6 +116,7 @@ class LoraModel(DeltaBase):
                  exclude_modules: Optional[List[str]] = None,
                  common_structure: Optional[bool] = None,
                  interactive_modify: Optional[Union[bool, int]] = False,
+                 backend: Optional[str] = "hf",
                  ):
         DeltaBase.__init__(self,
                            backbone_model,
@@ -121,6 +124,7 @@ class LoraModel(DeltaBase):
                            unfrozen_modules=unfrozen_modules,
                            common_structure=common_structure,
                            interactive_modify=interactive_modify,
+                           backend=backend,
                            )
         arg_names = get_arg_names_inside_func(self.__init__)
         for arg_name in arg_names:
@@ -144,15 +148,16 @@ class LoraModel(DeltaBase):
         pass
 
     def new_module_like(self, child_module):
-        if isinstance(child_module, nn.Linear):
-            in_features, out_features = child_module.in_features, child_module.out_features
-            new_module = LowRankLinear(in_features = in_features,
-                                     out_features = out_features,
-                                     weight = child_module.weight,
-                                     r=self.lora_r,
-                                     lora_alpha=self.lora_alpha,
-                                     lora_dropout=self.lora_dropout)
-            self.delta_modules.append(new_module)
-        else:
-            raise NotImplementedError
+        in_features, out_features = child_module.in_features, child_module.out_features
+        new_module = LowRankLinear(in_features = in_features,
+                                    out_features = out_features,
+                                    weight = child_module.weight,
+                                    r=self.lora_r,
+                                    lora_alpha=self.lora_alpha,
+                                    lora_dropout=self.lora_dropout)
+        if self.backend == "bmt":
+            import bmtrain as bmt
+            new_module = bmt.BMTrainModelWrapper(new_module)
+        
+        self.delta_modules.append(new_module)
         return new_module
