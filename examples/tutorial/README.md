@@ -24,9 +24,11 @@ pip install git+git@github.com:OpenBMB/ModelCenter.git
 2. download dataset from https://super.gluebenchmark.com/tasks, e.g., 
 ```
 mkdir down_data
-cd down_data
+mkdir down_data/superglue
+cd down_data/superglue
 wget https://dl.fbaipublicfiles.com/glue/superglue/data/v2/BoolQ.zip
 unzip BoolQ.zip
+cd ../../
 ```
 3. Run the shell scripts, change `NNODES`,`GPUS_PER_NODE` according to your computational resources.
 ```

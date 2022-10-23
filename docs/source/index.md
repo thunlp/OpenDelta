@@ -19,22 +19,34 @@ OpenDelta's documentation!
 
    notes/overview.md
    notes/installation.md
-   notes/usage.md
-   notes/namebasedaddr.md
-   notes/visualization.md
+   notes/quickstart.md
+   notes/custom.md
    notes/saveload.md
 
 .. toctree::
    :maxdepth: 1
    :caption: Advanced Usage
-
-   notes/keyfeature.md
-   notes/unifyname.md
+   
    notes/autodelta.md
    notes/composition.md
    notes/pluginunplug.md
-   notes/acceleration.md
-   notes/explored_config.md
+   notes/withbmtrain.md
+   notes/withaccelerate.md
+   notes/examples.md
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Utilities
+   
+   notes/inspect.md
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Mechanisms
+
+   notes/keyfeature.md
+   notes/namebasedaddr.md
+   notes/unifyname.md
 
 .. toctree::
    :maxdepth: 1

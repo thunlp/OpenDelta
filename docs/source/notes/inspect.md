@@ -1,3 +1,5 @@
+
+(visualization)=
 # Visualize the Parameters
 
 When OpenDelta makes modifications to a pretrained model (PTM), it is beneficial to know what your PTM looks like, especially the location of the parameters.
@@ -122,3 +124,6 @@ name: bertdelta_noparam
 :class: warning
 Currently, OpenDelta‘s Visualization visualize the model based on pytorch's named_modules method. That means the order of the presented submodule is the order they are add to the parent module, not necessarily the order that tensors flows through. 
 :::
+
+
+# Inspect the optimizer

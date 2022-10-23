@@ -1,6 +1,5 @@
-(basics)=
-# Basic Usage
-Now we introduce the general pipeline to migrate your full-model tuning scripts to a delta tuning one. 
+# Custom Usage
+Now we introduce the pipeline to migrate your full-model tuning scripts to a delta tuning one, **especial when your model is not in the default configuration list, or you don't want to use ghte default configuration**.
 
 ## STEP 1: Load the pretrained models
 
@@ -30,8 +29,6 @@ name: bart-base
 ````
 
 
-
-
 We can see from the structure graph that the feed forward layer in Bart is called `model.encoder.layers.$.fc1` and `model.encoder.layers.$.fc2`, where
 `$` represent a number from 0-5.  Since we want to apply adapter after *all* the feed forward layers, we specify the `modified_modules=['fc2']`, which is the common suffix for feed forward layers.
 <img src="../imgs/hint-icon-2.jpg" height="30px">  *For details about the name based addressing, see [Name-based submodule addressing](namebasedaddr)*
@@ -43,39 +40,6 @@ delta_model = AdapterModel(backbone_model=model, modified_modules=['fc2'], bottl
 delta_model.log() # This will visualize the backbone after modification and other information.
 ```
 
-
-
-### 2.2 Use the default modification.
-We also provide the default modifications of each delta methods for some commonly used PTMs (e.g., BERT, RoBERTA, DistilBERT, T5, GPT2), so the users don't need to specify the submodules to modify.
-
-The default modifications is achieved by mapping a name of a submodule to it's name on a common transformer structure. <img src="../imgs/hint-icon-2.jpg" height="30px">  *For details about the common structure mapping, see [Common Structure Mapping](commonstructure)*
-
-
-
-```python
-# a seperate example using BERT.
-from transformers import BertForMaskedLM
-from opendelta import AdapterModel
-model = BertForMaskedLM.from_pretrained("bert-base-cased")
-delta_model = AdapterModel(model) # This will apply adapter to the self-attn and feed-forward layer.
-delta_model.log()
-```
-````{collapse} <span style="color:rgb(141, 99, 224);font-weight:bold;font-style:italic">Click to view output</span>
-```{figure} ../imgs/defaultmodification.png
----
-width: 600px
-name: defaultmodification
----
-```
-````
-
-
-
-
-:::{admonition} Delta model vs Backbone model
-:class: note
-The delta_model **CAN NOT**  be used alone, and its [forward](opendelta.basemodel.DeltaBase.forward) is canceled. The training pipeline should be conducted on the backbone model (In the above example, its the `model`).
-:::
 
 :::{admonition} Try different positions
 :class: tip
@@ -126,5 +90,14 @@ The **model** then can be trained in traditional training scripts. Two things sh
 <img src="../imgs/hint-icon-2.jpg" height="30px"> *see [Save a delta model to local, or share with the community](saveload).*
 
 
+
+
+(favoredconfiguration)=
+##  Favored Configuration
+
+Generally, the default configurations are already good enough. If you want squeeze the size of delta models further, you can refer to the following papers.
+
+ - [AdapterDrop: On the Efficiency of Adapters in Transformers](https://arxiv.org/abs/2010.11918)
+ - [Sparse Structure Search for Parameter-Efficient Tuning(Delta Tuning)](https://arxiv.org/abs/2206.07382)
 
 
