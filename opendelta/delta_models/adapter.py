@@ -60,13 +60,14 @@ class AdapterLayer(nn.Module, InterFaceMixin):
     def get_layer_count(cls):
         return cls.layer_count
 
-    def __init__(self, bottleneck_dim=24, non_linearity='gelu_new', device=None):
+    def __init__(self, bottleneck_dim=24, non_linearity='gelu_new', device=None, backend="hf"):
         super().__init__()
         InterFaceMixin.__init__(self)
         self.bottleneck_dim = bottleneck_dim
         self.init_device = device
         self.instantiated = False
         self.non_linearity = non_linearity
+        self.backend=backend
 
         self.layer_id = AdapterLayer.get_layer_count()
         AdapterLayer.count_layer()
@@ -79,14 +80,16 @@ class AdapterLayer(nn.Module, InterFaceMixin):
         else:
             return self.init_device
 
-    def instantiate(self, hidden_dim):
+    def instantiate(self, hiddens):
+        self.hidden_dim = hiddens.shape[-1]
+        self.hidden_dtype = hiddens.dtype
         self.modulelist = nn.Sequential()
-        self.modulelist.add_module("down_proj",nn.Linear(hidden_dim, self.bottleneck_dim, device=self.init_device))
+        self.modulelist.add_module("down_proj",nn.Linear(self.hidden_dim, self.bottleneck_dim, device=self.init_device, dtype=self.hidden_dtype))
 
         # select non-linearity
         self.modulelist.add_module("non_linear", Activations(self.non_linearity.lower()))
 
-        self.modulelist.add_module("up_proj", nn.Linear(self.bottleneck_dim, self.hidden_dim,  device=self.init_device))
+        self.modulelist.add_module("up_proj", nn.Linear(self.bottleneck_dim, self.hidden_dim,  device=self.init_device, dtype=self.hidden_dtype))
 
         # TODO:
         # If we want to have a layer norm on output, we apply it later after a separate residual connection
@@ -97,6 +100,9 @@ class AdapterLayer(nn.Module, InterFaceMixin):
         self.instantiated = True
         # initialize the weight, which is important for fast convergence and better performance.
         self.apply(self._init_weight)
+        if self.backend == 'bmt':
+            import bmtrain as bmt
+            self.modulelist = bmt.BMTrainModelWrapper(self.modulelist)
 
     def _init_weight(self, module):
         if isinstance(module, nn.Linear):
@@ -118,19 +124,29 @@ class AdapterLayer(nn.Module, InterFaceMixin):
             raise TypeError
 
         hiddens = self._transpose(hiddens)
-        hiddens = self._convert_data_type(hiddens)
+        # if self.backend == 'hf':
+        #     hiddens = self._convert_data_type(hiddens)
+        # elif self.backend == 'bmt': # if bmt, left the convertion to bmt
+        #     pass
 
         if not self.instantiated:
-            self.hidden_dim = hiddens.shape[-1]
-            logger.debug(f"Got hidden dim hidden_dim {self.hidden_dim}")
-            self.instantiate(hidden_dim=self.hidden_dim)
+            # self.hidden_dim = hiddens.shape[-1]
+            # logger.debug(f"Got hidden dim hidden_dim {self.hidden_dim}")
+            self.instantiate(hiddens=hiddens)
 
-
+        # from IPython import embed; embed(header="14135315")
         adapter_output = self.modulelist(hiddens)
         modified_output = adapter_output + hiddens # TODO option: disable residual_connection
 
         modified_output = self._reverse_transpose(modified_output)
-        modified_output = self._reverse_data_type(modified_output)
+
+        # if self.backend == 'hf':
+        #     # print("!"*100)
+        #     modified_output = self._reverse_data_type(modified_output)
+        # elif self.backend == 'bmt': # if bmt, left the convertion to bmt
+        #     print("!"*100)
+        #     pass
+
 
         if isinstance(output, tuple):
             output = (modified_output,) + output[1:]
@@ -184,20 +200,24 @@ class AdapterModel(DeltaBase):
         modified_modules (:obj:`List[str]`): modules to add adapter after them.
         unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen together with the adapter parameters.
         common_structure (:obj:`bool`): whether using name-based addressing witha common structure mapping.
+        backend (:obj:`str`): choose the backend of plm, 'hf' for huggingface transformers,'bmt' for bmtrain. 
 
     """
     config_class = AdapterConfig
     delta_type = "adapter"
     default_modified_modules = ["attn@.proj@", "ff@.w2@"]
+    _supported_backends = ['hf', 'bmt']
     _need_pseudo_data = True
     def __init__(self,
                  backbone_model: nn.Module,
                  bottleneck_dim: Optional[int]=24,
                  non_linearity: Optional[str]='gelu_new',
-                 modified_modules: Optional[bool] = None,
+                 modified_modules: Optional[List[str]] = None,
+                 exclude_modules: Optional[List[str]] = None,
                  unfrozen_modules: Optional[bool] = None,
                  common_structure: Optional[bool] = None,
                  interactive_modify: Optional[Union[bool, int]] = False,
+                 backend: Optional[str] = 'hf',
                  ):
         DeltaBase.__init__(self,
                            backbone_model,
@@ -206,6 +226,7 @@ class AdapterModel(DeltaBase):
                            unfrozen_modules=unfrozen_modules,
                            common_structure=common_structure,
                            interactive_modify=interactive_modify,
+                           backend=backend,
                            )
         arg_names = get_arg_names_inside_func(self.__init__)
         for arg_name in arg_names:
@@ -226,6 +247,6 @@ class AdapterModel(DeltaBase):
 
     def new_module_like(self, module):
         module_device = get_device(module)
-        adapterlayer = AdapterLayer(bottleneck_dim=self.bottleneck_dim, non_linearity=self.non_linearity, device=module_device)
+        adapterlayer = AdapterLayer(bottleneck_dim=self.bottleneck_dim, non_linearity=self.non_linearity, device=module_device, backend=self.backend)
         self.delta_modules.append(adapterlayer)
         return adapterlayer

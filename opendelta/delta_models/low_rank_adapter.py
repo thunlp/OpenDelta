@@ -47,7 +47,8 @@ class LowRankAdapter(nn.Module):
                  non_linearity="gelu_new",
                  low_rank_w_init="glorot-uniform",
                  low_rank_rank=1,
-                 device=None):
+                 device=None, 
+                 backend='hf'):
         super().__init__()
         self.reduction_factor = reduction_factor
         self.non_linearity = non_linearity
@@ -55,20 +56,31 @@ class LowRankAdapter(nn.Module):
         self.low_rank_rank = low_rank_rank
         self.device = device
         self.instantiated = False
+        self.backend=backend
 
 
-    def instantiate(self, hidden_dim):
+    def instantiate(self, hiddens):
+        self.hidden_dim = hiddens.shape[-1]
+        self.hidden_dtype = hiddens.dtype
 
-        self.down_sample_size = hidden_dim // self.reduction_factor
+        self.down_sample_size = self.hidden_dim // self.reduction_factor
         self.activation = Activations(self.non_linearity.lower()).to(self.device)
-        self.down_sampler = LowRankLinear(hidden_dim, self.down_sample_size,
+        self.down_sampler = LowRankLinear(self.hidden_dim, self.down_sample_size,
                                           w_init=self.low_rank_w_init,
-                                          rank=self.low_rank_rank).to(self.device)
-        self.up_sampler = LowRankLinear(self.down_sample_size, hidden_dim,
+                                          rank=self.low_rank_rank,
+                                          dtype=self.hidden_dtype).to(self.device)
+        self.up_sampler = LowRankLinear(self.down_sample_size, self.hidden_dim,
                                         w_init=self.low_rank_w_init,
-                                        rank=self.low_rank_rank).to(self.device)
+                                        rank=self.low_rank_rank,
+                                        dtype=self.hidden_dtype).to(self.device)
 
         self.instantiated = True
+        if self.backend == 'bmt':
+            import bmtrain as bmt
+            self.activation = bmt.BMTrainModelWrapper(self.activation)
+            self.down_sampler = bmt.BMTrainModelWrapper(self.down_sampler)
+            self.up_sampler = bmt.BMTrainModelWrapper(self.up_sampler)
+
 
     def post_forward(self, output):
         r""" Get the hidden_states from the PLM's layer output, pass it into the low-rank adapter,
@@ -84,10 +96,7 @@ class LowRankAdapter(nn.Module):
             raise TypeError
 
         if not self.instantiated:
-            self.hidden_dim = hiddens.shape[-1]
-            logger.debug(f"Got hidden dim hidden_dim {self.hidden_dim}")
-            self.instantiate(hidden_dim=self.hidden_dim)
-
+            self.instantiate(hiddens = hiddens)
 
         z = self.down_sampler(hiddens)
         z = self.activation(z)
@@ -148,6 +157,7 @@ class LowRankAdapterModel(DeltaBase):
     config_class = LowRankAdapterConfig
     delta_type = "low_rank_adapter"
     default_modified_modules = ["attn@.proj@", "ff@.w2@"]
+    _supported_backends = ['hf', 'bmt']
     _need_pseudo_data = True
     def __init__(self,
                  backbone_model: nn.Module,
@@ -160,6 +170,7 @@ class LowRankAdapterModel(DeltaBase):
                  unfrozen_modules: Optional[List[str]] = None,
                  common_structure: Optional[bool] = None,
                  interactive_modify: Optional[Union[bool, int]] = False,
+                 backend: Optional[str] = 'hf',
                  ):
         DeltaBase.__init__(self,
                            backbone_model,
@@ -168,6 +179,7 @@ class LowRankAdapterModel(DeltaBase):
                            unfrozen_modules=unfrozen_modules,
                            common_structure=common_structure,
                            interactive_modify=interactive_modify,
+                           backend=backend,
                            )
         arg_names = get_arg_names_inside_func(self.__init__)
         for arg_name in arg_names:
@@ -203,6 +215,6 @@ class LowRankAdapterModel(DeltaBase):
                                       non_linearity = self.non_linearity,
                                       low_rank_w_init = self.low_rank_w_init,
                                       low_rank_rank = self.low_rank_rank,
-                                      device=module_device)
+                                      device=module_device, backend=self.backend)
         self.delta_modules.append(adapterlayer)
         return adapterlayer

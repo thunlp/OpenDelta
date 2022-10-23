@@ -25,30 +25,36 @@ class ParallelAdapterLayer(nn.Module):
     def get_layer_count(cls):
         return cls.layer_count
 
-    def __init__(self, bottleneck_dim=24, non_linearity='gelu_new', scaled=1, device=None):
+    def __init__(self, bottleneck_dim=24, non_linearity='gelu_new', scaled=1, device=None, backend='hf'):
         super().__init__()
         self.bottleneck_dim = bottleneck_dim
         self.device = device
         self.instantiated = False
         self.non_linearity = non_linearity
         self.scaled = scaled
+        self.backend = backend
         
         self.layer_id = ParallelAdapterLayer.get_layer_count()
         ParallelAdapterLayer.count_layer()
         
     
-    def instantiate(self, hidden_dim):
+    def instantiate(self, hiddens):
+        self.hidden_dim =  hiddens.shape[-1]
+        self.hidden_dtype = hiddens.dtype
         self.modulelist = nn.Sequential()
-        self.modulelist.add_module("down_proj",nn.Linear(hidden_dim, self.bottleneck_dim, device=self.device))
+        self.modulelist.add_module("down_proj",nn.Linear(self.hidden_dim, self.bottleneck_dim, device=self.device, dtype=self.hidden_dtype))
 
         # select non-linearity
         self.modulelist.add_module("non_linear", Activations(self.non_linearity.lower()))
 
-        self.modulelist.add_module("up_proj", nn.Linear(self.bottleneck_dim, self.hidden_dim,  device=self.device))
+        self.modulelist.add_module("up_proj", nn.Linear(self.bottleneck_dim, self.hidden_dim,  device=self.device, dtype=self.hidden_dtype))
 
         self.instantiated = True
         # initialize the weight, which is important for fast convergence and better performance. 
         self.apply(self._init_weight)
+        if self.backend == 'bmt':
+            import bmtrain as bmt
+            self.modulelist = bmt.BMTrainModelWrapper(self.modulelist)
     
     def _init_weight(self, module):
         if isinstance(module, nn.Linear):
@@ -71,9 +77,8 @@ class ParallelAdapterLayer(nn.Module):
 
 
         if not self.instantiated:
-            self.hidden_dim = hiddens.shape[-1]
-            logger.debug(f"Got hidden dim hidden_dim {self.hidden_dim}")
-            self.instantiate(hidden_dim=self.hidden_dim)
+            # logger.debug(f"Got hidden dim hidden_dim {self.hidden_dim}")
+            self.instantiate(hiddens = hiddens)
                 
 
         self.adapter_output = self.modulelist(hiddens) * self.scaled
@@ -141,12 +146,14 @@ class ParallelAdapterModel(DeltaBase):
         modified_modules (:obj:`List[str]`): modules to add parallel adapter. Must be paired and have the save order in layer. For examples, ["attn", "attn", "ff.w1", "ff.w2"] add one parallel adapter from attn's input to attn's output, and another one from ff.w1's input to ff.w2's output.
         unfrozen_modules (:obj:`List[str]`, *optional*, default to :obj:`None`): The modules that should be unfrozen together with the parallel adapter parameters.
         common_structure (:obj:`bool`): whether using name-based addressing witha common structure mapping.
+        backend (:obj:`str`): choose the backend of plm, 'hf' for huggingface transformers,'bmt' for bmtrain
 
     """
     config_class = ParallelAdapterConfig
     delta_type = "parallel_adapter"
     default_modified_modules = ["attn@", "attn@", "ff@.w1@", "ff@.w2@"]
     # default_modified_modules = ["attn", "attn", "ff.w1", "ff.w2"]
+    _supported_backends = ['hf', 'bmt']
     _need_pseudo_data = True
     def __init__(self,
                  backbone_model: nn.Module, 
@@ -156,7 +163,8 @@ class ParallelAdapterModel(DeltaBase):
                  exclude_modules: Optional[List[str]] = None,
                  unfrozen_modules: Optional[bool] = None,
                  common_structure: Optional[bool] = None,
-                 interactive_modify: Optional[Union[bool, int]] = False,
+                 interactive_modify: Optional[Union[bool, int]] = False,   
+                 backend: Optional[str] = "hf",
                  ):
         DeltaBase.__init__(self, 
                            backbone_model, 
@@ -165,6 +173,7 @@ class ParallelAdapterModel(DeltaBase):
                            unfrozen_modules=unfrozen_modules,
                            common_structure=common_structure,
                            interactive_modify=interactive_modify,
+                           backend=backend,
                            )
         arg_names = get_arg_names_inside_func(self.__init__)
         for arg_name in arg_names:
@@ -193,7 +202,7 @@ class ParallelAdapterModel(DeltaBase):
     
     def new_module_like(self, module):
         module_device = get_device(module)
-        adapterlayer = ParallelAdapterLayer(bottleneck_dim=self.bottleneck_dim, non_linearity=self.non_linearity, device=module_device)
+        adapterlayer = ParallelAdapterLayer(bottleneck_dim=self.bottleneck_dim, non_linearity=self.non_linearity, device=module_device, backend=self.backend)
         self.delta_modules.append(adapterlayer)  
         return adapterlayer
     

@@ -1,3 +1,5 @@
+# adapted from https://github.com/OpenBMB/ModelCenter/blob/main/examples/bert/finetune_bert.py
+
 import time
 import os
 
@@ -14,6 +16,11 @@ from model_center.dataset.bertdataset import DATASET
 from model_center.utils import print_inspect
 from model_center.layer import Linear
 from model_center.dataset import DistributedDataLoader
+
+import opendelta as od
+from opendelta import LoraModel, AdapterModel, CompacterModel, LowRankAdapterModel, BitFitModel, ParallelAdapterModel
+from opendelta.utils.inspect import inspect_optimizer_statistics
+print("before modify")
 
 class BertModel(torch.nn.Module):
     def __init__(self, args, num_types):
@@ -41,6 +48,31 @@ def get_model(args):
         "WiC" : 2,
     }
     model = BertModel(args, num_types[args.dataset_name])
+    od.Visualization(model).structure_graph()
+
+
+    if args.delta_type == "lora":
+        delta_model = LoraModel(backbone_model=model, modified_modules=['project_q', 'project_k'], backend='bmt')
+    elif args.delta_type == "bitfit":
+        delta_model = BitFitModel(backbone_model=model, modified_modules=['self_att', 'ffn', 'layernorm'], backend='bmt') #TODO: fix bug
+    elif args.delta_type == "adapter":
+        delta_model = AdapterModel(backbone_model=model, modified_modules=['self_att', 'ffn'], backend='bmt')
+    elif args.delta_type == "compacter":
+        delta_model = CompacterModel(backbone_model=model, modified_modules=['self_att', 'ffn'], backend='bmt')
+    elif args.delta_type == "low_rank_adapter":
+        delta_model = LowRankAdapterModel(backbone_model=model, modified_modules=['self_att', 'ffn'], backend='bmt')
+    elif args.delta_type == "parallel_adapter":
+        delta_model = ParallelAdapterModel(backbone_model=model, modified_modules=['self_att', 'self_att',  'ffn.ffn', 'ffn.ffn'], backend='bmt')
+
+
+
+    print("after modify")
+    delta_model.log()
+    # This will visualize the backbone after modification and other information.
+
+    delta_model.freeze_module(exclude=["deltas"], set_state_dict=True)
+    print("after freeze")
+    delta_model.log()
     return model
 
 def get_optimizer(args, model):
@@ -93,6 +125,8 @@ def setup_model_and_optimizer(args):
     bmt.synchronize()
     # get the optimizer and lr_scheduler
     optimizer = get_optimizer(args, model)
+
+    inspect_optimizer_statistics(optimizer)
     lr_scheduler = get_learning_rate_scheduler(args, optimizer)
     bmt.synchronize()
     # get the memory usage
@@ -124,7 +158,7 @@ def finetune(args, tokenizer, model, optimizer, lr_scheduler, dataset):
     optim_manager = bmt.optim.OptimManager(loss_scale=args.loss_scale)
     optim_manager.add_optimizer(optimizer, lr_scheduler)
 
-    print_inspect(model, '*')
+    # print_inspect(model, '*') # too much output
 
     for epoch in range(12):
         dataloader = {
@@ -171,6 +205,8 @@ def finetune(args, tokenizer, model, optimizer, lr_scheduler, dataset):
 
             torch.cuda.synchronize()
             elapsed_time = time.time() - st_time
+
+            # from IPython import embed; embed(header="25252")
 
             bmt.print_rank(
                 "train | epoch {:3d} | Iter: {:6d}/{:6d} | loss: {:.4f} | lr: {:.4e}, scale: {:10.4f} | grad_norm: {:.4f} | time: {:.3f}".format(
