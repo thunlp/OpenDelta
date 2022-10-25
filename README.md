@@ -32,6 +32,7 @@ OpenDelta is a toolkit for parameter-efficient tuning methods (we dub it as *del
 ![How PLM changes using Delta-tuning](docs/source/imgs/demo.gif)
 
 ## News
+- **2022.10.25** Release v0.3.2. Support [BMTrain]()! Improve docs. Add inspect utilities.
 - **2022.10.14** Release v0.3.0. We make the usage of default configurations of each delta tuning methods (i.e., the position they are attached) more friendly! If a custom model has our supported models as submodules inside, the default configuration is also available. Other key changes can be seen in [Update Log](https://opendelta.readthedocs.io/en/latest/notes/update.html#version-0-3-0)
 - **2022.10.10** Merge a long-developed branch v0.2.4 into the master branch. Key updates are (1) the an example unifying the delta tuning paradigm and the prompt-tuning paradigm; (2) and support for [Delta Center](https://www.openbmb.org/toolKits/deltacenter), whose webpage is still under construction. Details can be seen in [Update Log](https://opendelta.readthedocs.io/en/latest/notes/update.html#version-0-2-4)
 - **2022.03.24** We notice several bugs in Soft Prompt Tuning and Prefix Tuning, mainly due to their need to customize attention ids, token_type_ids, we are fixing it! Currently, please use the other methods since they are stabler and better in performance. 
@@ -40,50 +41,32 @@ OpenDelta is a toolkit for parameter-efficient tuning methods (we dub it as *del
 - **2022.02.16** Support [regular expression](https://opendelta.readthedocs.io/en/latest/notes/namebasedaddr.html#regexexpr) in named-based addressing. 
 
 ## Installation
-create a virtualenv (optional)
+1. create a virtualenv (optional)
 ```shell
 conda create -n opendelta_env python=3.8
 conda activate opendelta_env
 ```
 
-### Using Pip
+2 install the lastest version
+```bash
+pip install git+https://github.com/thunlp/OpenDelta.git
+```
 
-
-
-Install OpenDelta using pip as follows:
-```shell
+**or** install the lastest pip version (more stable)
+```bash
 pip install opendelta
 ```
-
-To play with the latest features, you can also install OpenDelta from the source.
-
-### Build from Source
-
-```shell
-git clone https://github.com/thunlp/OpenDelta.git
+**or** build from source
+```bash
+git clone git@github.com:thunlp/OpenDelta.git
 cd OpenDelta
-``` 
-
-#### Option 1: If you won't modify the code, run
-```shell
 python setup.py install
-```
+# python setup.py develop # if you want to do some modifications on the code for your research:
 
-#### Option 2:  If you want to modify the code or keep the repo updated by git clone, run
-```shell
-python setup.py develop
-```
-
-#### Tips
-- If you want to use mirror for installing the packages, please change the `index_url` in [setup.cfg](setup.cfg)
-
-- If you encounter network error using setup.py, please firstly install the dependencies via
-```shell
-pip install -r requirements.txt && python setup.py develop
 ```
 
 ## Must Try
-The following codes and comments walk you through the key functionality of OpenDelta. It is also in [must_try.py](https://github.com/thunlp/OpenDelta/tree/main/examples/unittest/must_try.py)
+The following codes and comments walk you through the key functionality of OpenDelta. It is also in [must_try.py](https://github.com/thunlp/OpenDelta/tree/main/examples/unittest/must_try.py) and [must_try.ipynb in colab](https://colab.research.google.com/drive/1Nbe9zxt8LGQnKmtvEs07IN_PznjNCyk4?usp=sharing).
 
 ```python
 # use tranformers as usual.
@@ -168,6 +151,8 @@ used models that OpenDelta are sure to support.
 - We will keep testing more and more emerging models.
 
 - Pull requests are welcomed when you successfully apply OpenDelta on your own backbone model.
+
+
 
 
 

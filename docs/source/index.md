@@ -21,13 +21,14 @@ OpenDelta's documentation!
    notes/installation.md
    notes/quickstart.md
    notes/custom.md
-   notes/saveload.md
+   
 
 .. toctree::
    :maxdepth: 1
    :caption: Advanced Usage
    
    notes/autodelta.md
+   notes/deltacenter.md
    notes/composition.md
    notes/pluginunplug.md
    notes/withbmtrain.md
