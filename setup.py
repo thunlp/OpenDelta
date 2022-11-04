@@ -6,7 +6,7 @@ import os
 
 requires = """torch>=1.8.0
 transformers>=4.10.0
-datasets==1.17.0
+datasets>=1.17.0
 sentencepiece>=0.1.96
 tqdm>=4.62.2
 decorator
