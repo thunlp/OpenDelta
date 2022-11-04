@@ -140,6 +140,8 @@ class DeltaBase(nn.Module, SaveLoadMixin):
             self.structure_mapping = None
         if unfrozen_modules is None:
             self.unfrozen_modules = self.default_unfrozen_modules
+        else:
+            self.unfrozen_modules = unfrozen_modules
         if self.common_structure and self.structure_mapping is None:
             raise RuntimeError("Using common structure but the structure mapping is None")
         if backend not in self._supported_backends:
