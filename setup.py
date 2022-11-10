@@ -16,6 +16,7 @@ gitpython
 scipy # need?
 sklearn # need?
 delta_center_client==0.0.4
+bigmodelvis
 """
 
 def get_requirements():

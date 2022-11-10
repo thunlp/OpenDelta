@@ -148,7 +148,7 @@ def main():
         logger.info('parallelize model!')
         model.parallelize()
 
-    from opendelta import Visualization
+    from bigmodelvis import Visualization
     Visualization(model).structure_graph()
 
     if delta_args.delta_type.lower() != "none":

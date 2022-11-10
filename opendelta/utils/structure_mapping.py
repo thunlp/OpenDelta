@@ -1,7 +1,7 @@
 from typing import OrderedDict
 import copy
 import opendelta.utils.logging as logging
-from opendelta.utils.visualization import Visualization
+from bigmodelvis import Visualization
 logger = logging.get_logger(__name__)
 
 

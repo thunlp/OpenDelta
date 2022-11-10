@@ -690,7 +690,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
 
 
         if visualization:
-            from opendelta import Visualization
+            from bigmodelvis import Visualization
             Visualization(module).structure_graph()
 
         self.stat = inspect_module_statistics(module, verbose=False)

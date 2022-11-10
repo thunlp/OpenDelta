@@ -1,6 +1,6 @@
 from copy import deepcopy
 from typing import Any, Dict, OrderedDict
-from opendelta.utils.visualization import Visualization
+from bigmodelvis import Visualization
 import torch.nn as nn
 from opendelta.utils.logging import get_logger
 import importlib

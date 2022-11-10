@@ -1,4 +1,4 @@
-from opendelta.utils.visualization import Visualization
+from bigmodelvis import Visualization
 import web
 import re, os
 
