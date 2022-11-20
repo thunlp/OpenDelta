@@ -56,8 +56,7 @@ def get_model(args):
         "WiC" : 2,
     }
     model = BertModel(args, num_types[args.dataset_name])
-    od.Visualization(model).structure_graph()
-
+    # od.Visualization(model).structure_graph()
 
     if args.delta_type == "lora":
         delta_model = LoraModel(backbone_model=model, modified_modules=['project_q', 'project_k'], backend='bmt')
@@ -289,7 +288,7 @@ def main():
     dataset = prepare_dataset(
         args,
         tokenizer,
-        f"{args.base_path}/down_data/superglue/",
+        f"/yinxr/zwl/ModelCenter/down_data/superglue/",
         args.dataset_name,
         bmt.rank(), bmt.world_size(),
     )

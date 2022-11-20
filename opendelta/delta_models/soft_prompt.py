@@ -161,7 +161,7 @@ class SoftPromptModel(DeltaBase):
     config_class = SoftPromptConfig
     delta_type = "soft_prompt"
     default_modified_modules = ["root"]  # not used
-    _supported_backends = ['hf'] #'bmt']
+    _supported_backends = ['hf', 'bmt']
     _need_pseudo_data = False
     def __init__(self,
                  backbone_model: nn.Module,
@@ -223,10 +223,8 @@ class SoftPromptModel(DeltaBase):
             init_range = self.init_range,
             device = module_device,
         )
-        try:
+        if self.backend == 'bmt':
             import bmtrain as bmt
             soft_prompt_layer = bmt.BMTrainModelWrapper(soft_prompt_layer)
-        except:
-            pass
         self.delta_modules.append(soft_prompt_layer)
         return soft_prompt_layer
