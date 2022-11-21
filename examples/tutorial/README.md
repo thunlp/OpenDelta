@@ -19,7 +19,7 @@ pip install openprompt
 1. install necessary packages:
 ```
 pip install git+https://github.com/OpenBMB/BMTrain.git
-pip install git+git@github.com:OpenBMB/ModelCenter.git
+
 ```
 2. download dataset from https://super.gluebenchmark.com/tasks, e.g., 
 ```
