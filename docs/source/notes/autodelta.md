@@ -34,7 +34,7 @@ Then use the config to add a delta model to the backbone model
 delta_model = AutoDeltaModel.from_config(delta_config, backbone_model=backbone_model)
 
 # now visualize the modified backbone_model
-from opendelta import Visualization
+from bigmodelvis import Visualization
 Visualizaiton(backbone_model).structure_graph()
 ```
 

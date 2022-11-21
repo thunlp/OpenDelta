@@ -35,7 +35,7 @@ print(root.name_b[0].name_a)
 We can visualize the model (For details, see [visualization](visualization))
 
 ```python
-from opendelta import Visualization
+from bigmodelvis import Visualization
 Visualization(root).structure_graph()
 ```
 

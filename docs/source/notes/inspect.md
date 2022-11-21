@@ -30,12 +30,12 @@ name: raw_print
 The original presentation of models is **not tailored for repeated structures, big models, or parameters-centric tasks**.
 
 
-## Using visualization from opendelta.
+## Using visualization from bigmodelvis.
 
 First let's visualize all the parameters in the bert model. As we can see, structure inside a bert model, and the all the paramters location of the model are neatly represented in tree structure. (See [color scheme](color_schema) for the colors)
 
 ```python
-from opendelta import Visualization
+from bigmodelvis import Visualization
 model_vis = Visualization(backbone_model)
 model_vis.structure_graph()
 ```

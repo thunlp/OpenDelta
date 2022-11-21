@@ -28,6 +28,7 @@ from model_center.dataset import DistributedDataLoader
 import opendelta as od
 from opendelta import LoraModel, AdapterModel, CompacterModel, LowRankAdapterModel, BitFitModel, ParallelAdapterModel
 from opendelta.utils.inspect import inspect_optimizer_statistics
+from bigmodelvis import Visualization
 print("before modify")
 
 class BertModel(torch.nn.Module):
@@ -56,7 +57,7 @@ def get_model(args):
         "WiC" : 2,
     }
     model = BertModel(args, num_types[args.dataset_name])
-    # od.Visualization(model).structure_graph()
+    Visualization(model).structure_graph()
 
     if args.delta_type == "lora":
         delta_model = LoraModel(backbone_model=model, modified_modules=['project_q', 'project_k'], backend='bmt')

@@ -15,7 +15,7 @@ Delta tuning's core change in the structure of the base model is to decorate (mo
 We should first know the name of the feedforward layer in the BART model by visualization. <img src="../imgs/hint-icon-2.jpg" height="30px"> *For more about visualization, see [Visualization](visualization).*
 
 ```python
-from opendelta import Visualization
+from bigmodelvis import Visualization
 Visualization(model).structure_graph()
 ```
 
