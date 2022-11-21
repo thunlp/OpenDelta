@@ -19,7 +19,7 @@
 
 </div>
 
-![version](https://img.shields.io/badge/version-0.0.1-blue)
+![version](https://img.shields.io/badge/version-0.3.2-blue)
 
 
 ## Overview
