@@ -12,7 +12,7 @@
 
 
 ```{eval-rst}
-.. autoclass:: opendelta.utils.visualization.Visualization
+.. autoclass:: bigmodelvis.Visualization
     :members:
 ```
 
