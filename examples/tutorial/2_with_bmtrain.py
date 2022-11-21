@@ -1,5 +1,8 @@
 # adapted from https://github.com/OpenBMB/ModelCenter/blob/main/examples/bert/finetune_bert.py
 
+# For ModelCenter, `pip install model_center >= 1.0.0`
+# For BMTrain, `git clone https://github.com/OpenBMB/BMTrain.git` and `python3 setup.py install` locally, as it has not been released currently.
+
 import time
 import os
 
@@ -57,6 +60,7 @@ def get_model(args):
         "WiC" : 2,
     }
     model = BertModel(args, num_types[args.dataset_name])
+    from bigmodelvis import Visualization
     Visualization(model).structure_graph()
 
     if args.delta_type == "lora":
