@@ -17,6 +17,7 @@ import torch
 import opendelta.utils.logging as logging
 logger = logging.get_logger(__name__)
 
+# We are going to refactor the code of Prefix Tuning.
 
 class PrefixLayerT5(nn.Module):
     r"""A layer of prefix tuning module. The layer's forward function pass (or concatenate) the additional past_key_value
