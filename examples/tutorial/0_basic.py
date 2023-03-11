@@ -2,7 +2,7 @@ from transformers import AutoModelForSequenceClassification
 model = AutoModelForSequenceClassification.from_pretrained("facebook/bart-base")
 # suppose we load BART
 
-from opendelta import Visualization
+from bigmodelvis import Visualization
 print("before modify")
 Visualization(model).structure_graph()
 """
