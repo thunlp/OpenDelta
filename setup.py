@@ -14,7 +14,7 @@ rich
 web.py
 gitpython
 scipy # need?
-sklearn # need?
+scikit-learn # need?
 delta_center_client==0.0.4
 bigmodelvis
 """
