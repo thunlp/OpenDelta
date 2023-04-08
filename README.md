@@ -3,7 +3,7 @@
 
 <img src="https://s4.ax1x.com/2022/02/14/Hy7lAf.png" width="350px">
 
-**An Open-Source Framework for Paramter-Efficient Tuning (Delta Tuning).**
+**An Open-Source Framework for Parameter-Efficient Tuning (Delta Tuning).**
 
 ------
 
@@ -24,11 +24,11 @@
 
 ## Overview
 
-OpenDelta is a toolkit for parameter-efficient tuning methods (we dub it as *delta tuning*), by which users could flexibly assign (or add) a small amount parameters to update while keeping the most paramters frozen. By using OpenDelta, users could easily implement prefix-tuning, adapters, Lora, or any other types of delta tuning with preferred PTMs.
+OpenDelta is a toolkit for parameter-efficient tuning methods (we dub it as *delta tuning*), by which users could flexibly assign (or add) a small amount parameters to update while keeping the most parameters frozen. By using OpenDelta, users could easily implement prefix-tuning, adapters, Lora, or any other types of delta tuning with preferred PTMs.
 
 - The latest version of OpenDelta is tested on Python==3.8.13, PyTorch==1.12.1, transformers==4.22.2. Other versions are likely to be supported as well. If you encounter bugs when using your own package versions, please raise an issue, we will look into it as soon as possible. 
 
-- **A demo of using Opendelta to modify the PLM (E.g., BART).**
+- **A demo of using OpenDelta to modify the PLM (E.g., BART).**
 ![How PLM changes using Delta-tuning](docs/source/imgs/demo.gif)
 
 ## News
@@ -36,7 +36,7 @@ OpenDelta is a toolkit for parameter-efficient tuning methods (we dub it as *del
 - **2022.10.14** Release v0.3.0. We make the usage of default configurations of each delta tuning methods (i.e., the position they are attached) more friendly! If a custom model has our supported models as submodules inside, the default configuration is also available. Other key changes can be seen in [Update Log](https://opendelta.readthedocs.io/en/latest/notes/update.html#version-0-3-0)
 - **2022.10.10** Merge a long-developed branch v0.2.4 into the master branch. Key updates are (1) the an example unifying the delta tuning paradigm and the prompt-tuning paradigm; (2) and support for [Delta Center](https://www.openbmb.org/toolKits/deltacenter), whose webpage is still under construction. Details can be seen in [Update Log](https://opendelta.readthedocs.io/en/latest/notes/update.html#version-0-2-4)
 - **2022.03.24** We notice several bugs in Soft Prompt Tuning and Prefix Tuning, mainly due to their need to customize attention ids, token_type_ids, we are fixing it! Currently, please use the other methods since they are stabler and better in performance. 
-- **2022.03.20** Add a [colab example](https://colab.research.google.com/drive/1uAhgAdc8Qr42UKYDlgUv0f7W1-gAFwGo?usp=sharing) to illustrate efficient training and space-saving multitask-serving.
+- **2022.03.20** Add a [Colab example](https://colab.research.google.com/drive/1uAhgAdc8Qr42UKYDlgUv0f7W1-gAFwGo?usp=sharing) to illustrate efficient training and space-saving multitask-serving.
 - **2022.03.20** A new pip version released.
 - **2022.02.16** Support [regular expression](https://opendelta.readthedocs.io/en/latest/notes/namebasedaddr.html#regexexpr) in named-based addressing. 
 
@@ -47,12 +47,12 @@ conda create -n opendelta_env python=3.8
 conda activate opendelta_env
 ```
 
-2 install the lastest version
+2. install the latest version
 ```bash
 pip install git+https://github.com/thunlp/OpenDelta.git
 ```
 
-**or** install the lastest pip version (more stable)
+**or** install the latest pip version (more stable)
 ```bash
 pip install opendelta
 ```
@@ -66,15 +66,15 @@ python setup.py install
 ```
 
 ## Must Try
-The following codes and comments walk you through the key functionality of OpenDelta. It is also in [must_try.py](https://github.com/thunlp/OpenDelta/tree/main/examples/unittest/must_try.py) and [must_try.ipynb in colab](https://colab.research.google.com/drive/1Nbe9zxt8LGQnKmtvEs07IN_PznjNCyk4?usp=sharing).
+The following codes and comments walk you through the key functionality of OpenDelta. It is also in [must_try.py](https://github.com/thunlp/OpenDelta/tree/main/examples/unittest/must_try.py) and [must_try.ipynb in Colab](https://colab.research.google.com/drive/1Nbe9zxt8LGQnKmtvEs07IN_PznjNCyk4?usp=sharing).
 
 ```python
-# use tranformers as usual.
+# use transformers as usual.
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 t5 = AutoModelForSeq2SeqLM.from_pretrained("t5-large")
 t5_tokenizer = AutoTokenizer.from_pretrained("t5-large")
 # A running example
-inputs_ids = t5_tokenizer.encode("Is Harry Poter wrtten by JKrowling", return_tensors="pt")
+inputs_ids = t5_tokenizer.encode("Is Harry Potter written by J.K. Rowling", return_tensors="pt")
 t5_tokenizer.decode(t5.generate(inputs_ids)[0]) 
 # >>> '<pad><extra_id_0>? Is it Harry Potter?</s>'
 
@@ -90,7 +90,7 @@ delta.log()
 
 
 t5_tokenizer.decode(t5.generate(inputs_ids)[0]) 
-# >>> <pad> Is Harry Potter written by JK Rowling?</s>
+# >>> <pad> Is Harry Potter written by J.K. Rowling?</s>
 
 
 # Now save merely the delta models, not the whole backbone model, to tmp/
@@ -105,14 +105,14 @@ t5 = AutoModelForSeq2SeqLM.from_pretrained("t5-large")
 delta1 = AutoDeltaModel.from_finetuned(".tmp", backbone_model=t5)
 import shutil; shutil.rmtree(".tmp") # don't forget to remove the tmp files. 
 t5_tokenizer.decode(t5.generate(inputs_ids)[0]) 
-# >>> <pad> Is Harry Potter written by JK Rowling?</s>
+# >>> <pad> Is Harry Potter written by J.K. Rowling?</s>
 
 # detach the delta models, the model returns to the unmodified status.
 delta1.detach()
 t5_tokenizer.decode(t5.generate(inputs_ids)[0])  
 # >>> '<pad><extra_id_0>? Is it Harry Potter?</s>'
 
-# use default configuration for cunstomized wrapped models which have PLMs inside. This is a common need for users. 
+# use default configuration for customized wrapped models which have PLMs inside. This is a common need for users. 
 import torch.nn as nn
 class WrappedModel(nn.Module):
   def __init__(self, inner_model):
