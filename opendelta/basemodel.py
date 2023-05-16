@@ -643,7 +643,7 @@ class DeltaBase(nn.Module, SaveLoadMixin):
         """
         def _caller(_org_func, includes,  *args, **kwargs):
             state_dict = _org_func(*args, **kwargs)
-            keys = list(state_dict.keys())3
+            keys = list(state_dict.keys())
             for n  in keys:
                 if n not in includes:
                     state_dict.pop(n)
