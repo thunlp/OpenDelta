@@ -3,7 +3,6 @@
 from collections import OrderedDict
 from multiprocessing.sharedctypes import Value
 import os
-from turtle import back
 from opendelta.delta_configs import BaseDeltaConfig
 from opendelta.utils.inspect import inspect_module_statistics
 from opendelta.utils.model_md5 import gen_model_hash
