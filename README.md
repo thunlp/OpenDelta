@@ -153,9 +153,25 @@ used models that OpenDelta are sure to support.
 - Pull requests are welcomed when you successfully apply OpenDelta on your own backbone model.
 
 
+## Citation
 
+```bibtex
+@article{hu2023opendelta,
+  title={OpenDelta: A Plug-and-play Library for Parameter-efficient Adaptation of Pre-trained Models},
+  author={Hu, Shengding and Ding, Ning and Zhao, Weilin and Lv, Xingtai and Zhang, Zhen and Liu, Zhiyuan and Sun, Maosong},
+  journal={arXiv preprint arXiv:2307.03084},
+  year={2023}
+}
+```
 
-
+```bibtex
+@article{ding2022delta,
+  title={Delta tuning: A comprehensive study of parameter efficient methods for pre-trained language models},
+  author={Ding, Ning and Qin, Yujia and Yang, Guang and Wei, Fuchao and Yang, Zonghan and Su, Yusheng and Hu, Shengding and Chen, Yulin and Chan, Chi-Min and Chen, Weize and others},
+  journal={arXiv preprint arXiv:2203.06904},
+  year={2022}
+}
+```
 
 
 
