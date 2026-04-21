@@ -2,16 +2,37 @@ from functools import partial
 from opendelta.delta_configs import BaseDeltaConfig
 from opendelta.utils.signature import get_arg_names_inside_func, signature
 from typing import Optional, Union
-from transformers.models.distilbert.modeling_distilbert import MultiHeadSelfAttention
-from transformers.models.t5.modeling_t5 import T5Attention, T5LayerSelfAttention
-from transformers.models.bert.modeling_bert import BertAttention
-from transformers.models.gpt2.modeling_gpt2 import GPT2Attention
-from transformers.models.bart.modeling_bart import BartAttention
-from transformers.models.roberta.modeling_roberta import RobertaAttention
+
+
+# from transformers.models.distilbert.modeling_distilbert import MultiHeadSelfAttention
+# from transformers.models.t5.modeling_t5 import T5Attention, T5LayerSelfAttention
+# from transformers.models.bert.modeling_bert import BertAttention
+# from transformers.models.gpt2.modeling_gpt2 import GPT2Attention
+# from transformers.models.bart.modeling_bart import BartAttention
+# from transformers.models.roberta.modeling_roberta import RobertaAttention
+# from transformers.models.t5 import T5ForConditionalGeneration
+for import_path in [
+    "transformers.models.distilbert.modeling_distilbert.MultiHeadSelfAttention",
+    "transformers.models.t5.modeling_t5.T5Attention",
+    "transformers.models.t5.modeling_t5.T5LayerSelfAttention",
+    "transformers.models.bert.modeling_bert.BertAttention",
+    "transformers.models.gpt2.modeling_gpt2.GPT2Attention",
+    "transformers.models.bart.modeling_bart.BartAttention",
+    "transformers.models.roberta.modeling_roberta.RobertaAttention",
+]:
+    try:
+        components = import_path.split(".")
+        module_path = ".".join(components[:-1])
+        class_name = components[-1]
+        module = __import__(module_path, fromlist=[class_name])
+        globals()[class_name] = getattr(module, class_name)
+    except Exception as e:
+        print(f"Warning: Failed to import {import_path}. Error: {e}")
+        pass
+
 from opendelta.utils.name_based_addressing import *
 from opendelta.utils.cuda import get_device
 from opendelta.basemodel import DeltaBase
-from transformers.models.t5 import T5ForConditionalGeneration
 import torch.nn as nn
 import torch
 import opendelta.utils.logging as logging

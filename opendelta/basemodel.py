@@ -17,7 +17,6 @@ from functools import wraps
 from opendelta.utils.decorate import decorate
 from opendelta.utils.structure_mapping import transform
 from transformers.file_utils import PushToHubMixin
-from transformers.deepspeed import deepspeed_config, is_deepspeed_zero3_enabled
 from opendelta import SaveLoadMixin
 from opendelta import logging
 from opendelta.utils.structure_mapping import CommonStructureMap
